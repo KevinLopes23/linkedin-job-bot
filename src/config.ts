@@ -10,6 +10,7 @@ export interface Config {
   searchKeywords: string[];
   databasePath: string;
   scraperDelayMs: number;
+  searchTimeHours: number;
 }
 
 const getEnvOrThrow = (key: string): string => {
@@ -30,4 +31,5 @@ export const config: Config = {
     .filter((kw) => kw.length > 0),
   databasePath: process.env.DATABASE_PATH || path.join(__dirname, '..', 'data', 'jobs.db'),
   scraperDelayMs: parseInt(process.env.SCRAPER_DELAY_MS || '5000', 10),
+  searchTimeHours: parseInt(process.env.SEARCH_TIME_HOURS || '1', 10),
 };
