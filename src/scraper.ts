@@ -176,15 +176,15 @@ export class LinkedInScraper {
     for (const keyword of config.searchKeywords) {
       const encoded = encodeURIComponent(keyword);
 
-      // 1. Brasil — Somente Remoto (f_WT=2), Júnior/Pleno, Última 1 hora
+      // 1. Brasil — Somente Remoto (f_WT=2), Júnior/Pleno/Sênior (f_E=2,3,4), Última 1 hora
       urls.push({
-        url: `https://www.linkedin.com/jobs/search/?f_TPR=r3600&f_WT=2&geoId=106057199&f_E=2%2C3&keywords=${encoded}`,
+        url: `https://www.linkedin.com/jobs/search/?f_TPR=r3600&f_WT=2&geoId=106057199&f_E=2%2C3%2C4&keywords=${encoded}`,
         tipo: 'remoto',
       });
 
-      // 2. Bauru-SP — Presencial e Híbrido (f_WT=1,3), Júnior/Pleno, Última 1 hora
+      // 2. Bauru-SP — Presencial e Híbrido (f_WT=1,3), Júnior/Pleno/Sênior (f_E=2,3,4), Última 1 hora
       urls.push({
-        url: `https://www.linkedin.com/jobs/search/?f_TPR=r3600&f_WT=1%2C3&geoId=104741620&f_E=2%2C3&keywords=${encoded}`,
+        url: `https://www.linkedin.com/jobs/search/?f_TPR=r3600&f_WT=1%2C3&location=Bauru%2C%20S%C3%A3o%20Paulo%2C%20Brasil&f_E=2%2C3%2C4&keywords=${encoded}`,
         tipo: 'bauru',
       });
     }
