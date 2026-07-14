@@ -471,6 +471,7 @@ export class LinkedInScraper {
         const bodyText = await page.textContent('body') || '';
         const bodyLower = bodyText.toLowerCase();
 
+        /*
         const ehPromovida =
           // Texto visível específico do LinkedIn (PT e EN)
           bodyLower.includes('promovida por') ||
@@ -485,11 +486,29 @@ export class LinkedInScraper {
           console.log(`[Scraper] ❌ Vaga "${vaga.titulo}" (ID: ${vaga.id}) é promovida. Ignorando.`);
           continue;
         }
+        */
 
-        // Filtro de exclusão extra no texto completo da vaga (pega palavras que não apareceram no card resumido da busca)
-        if (this.contemTermoExclusao(bodyLower)) {
-          console.log(`[Scraper] ❌ Vaga "${vaga.titulo}" (ID: ${vaga.id}) contém termo proibido no descritivo completo. Ignorando.`);
-          continue;
+        // Filtro de quantidade máxima de candidatos
+        if (config.maxApplicants > 0) {
+          const applicantRegex = /(\d+)\s+(pessoas clicaram em|candidatura|applicant)/i;
+          const match = bodyLower.match(applicantRegex);
+          
+          if (!match) {
+            const matchMaisDe = bodyLower.match(/mais de (\d+)\s+(candidatura|applicant)/i) || bodyLower.match(/over (\d+)\s+applicant/i);
+            if (matchMaisDe) {
+              const numApplicants = parseInt(matchMaisDe[1], 10);
+              if (numApplicants > config.maxApplicants) {
+                console.log(`[Scraper] ❌ Vaga "${vaga.titulo}" (ID: ${vaga.id}) tem muitos candidatos (mais de ${numApplicants}). Limite: ${config.maxApplicants}. Ignorando.`);
+                continue;
+              }
+            }
+          } else {
+            const numApplicants = parseInt(match[1], 10);
+            if (numApplicants > config.maxApplicants) {
+              console.log(`[Scraper] ❌ Vaga "${vaga.titulo}" (ID: ${vaga.id}) tem muitos candidatos (${numApplicants}). Limite: ${config.maxApplicants}. Ignorando.`);
+              continue;
+            }
+          }
         }
 
         console.log(`[Scraper] ✅ Vaga "${vaga.titulo}" (ID: ${vaga.id}) verificada — aprovada.`);
