@@ -2,12 +2,14 @@ import cron from 'node-cron';
 import { DatabaseService } from './database';
 import { LinkedInScraper } from './scraper';
 import { TelegramService } from './telegram';
+import { config } from './config';
 
 const dbService = new DatabaseService();
 const telegramService = new TelegramService();
 
 async function executarFluxoScraping() {
   console.log(`[Orquestrador] [${new Date().toISOString()}] Iniciando ciclo de scraping...`);
+  console.log(`[Orquestrador] Buscando vagas das últimas ${config.searchTimeHours} horas...`);
   const scraper = new LinkedInScraper();
 
   try {
