@@ -73,6 +73,7 @@ export class LinkedInScraper {
 
     // ── Empresas Bloqueadas ──
     /\bbairesdev\b/i,
+    /\bhire\s+feed\b/i,
 
     // ── Cargos que contêm "developer" mas NÃO são de software ──
     /\bproposal\b/i,
