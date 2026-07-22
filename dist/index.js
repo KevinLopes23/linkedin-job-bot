@@ -7,10 +7,12 @@ const node_cron_1 = __importDefault(require("node-cron"));
 const database_1 = require("./database");
 const scraper_1 = require("./scraper");
 const telegram_1 = require("./telegram");
+const config_1 = require("./config");
 const dbService = new database_1.DatabaseService();
 const telegramService = new telegram_1.TelegramService();
 async function executarFluxoScraping() {
     console.log(`[Orquestrador] [${new Date().toISOString()}] Iniciando ciclo de scraping...`);
+    console.log(`[Orquestrador] Buscando vagas das últimas ${config_1.config.searchTimeHours} horas...`);
     const scraper = new scraper_1.LinkedInScraper();
     try {
         await scraper.init();

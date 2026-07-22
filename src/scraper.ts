@@ -309,6 +309,57 @@ export class LinkedInScraper {
     return tipoBusca === 'remoto' ? 'Remoto' : 'Presencial';
   }
 
+  /**
+   * Extrai o modelo de trabalho real a partir do texto completo da página de detalhe da vaga.
+   * Mais confiável que a extração do card pois a página de detalhe contém badges e critérios explícitos.
+   * Usa prioridade Presencial > Híbrido > Remoto para evitar falsos positivos
+   * (ex: descrição menciona "remoto" mas o modelo real é Híbrido).
+   * 
+   * Procura por padrões comuns do LinkedIn como:
+   * - "Trabalho remoto", "Modelo: Remoto", "Remote"
+   * - "Híbrido", "Hybrid" 
+   * - "Presencial", "On-site"
+   * 
+   * Retorna null se não conseguir determinar o modelo com confiança.
+   */
+  private extrairModeloDaPagina(bodyLower: string): string | null {
+    // Padrões específicos do LinkedIn para modelo de trabalho
+    // Esses padrões aparecem em badges/tags na página de detalhe
+    const presencialPatterns = [
+      /\bpresencial\b/,
+      /\bon-site\b/,
+      /\bon site\b/,
+    ];
+
+    const hibridoPatterns = [
+      /\bhíbrido\b/,
+      /\bhybrid\b/,
+    ];
+
+    const remotoPatterns = [
+      /\bremoto\b/,
+      /\bremote\b/,
+      /\btrabalho remoto\b/,
+    ];
+
+    // Prioridade: Presencial > Híbrido > Remoto
+    // Essa ordem evita falsos positivos: se a página diz "Híbrido" E "remoto"
+    // (ex: "Híbrido com possibilidade de remoto"), o correto é classificar como Híbrido.
+    const ehPresencial = presencialPatterns.some((p) => p.test(bodyLower));
+    const ehHibrido = hibridoPatterns.some((p) => p.test(bodyLower));
+    const ehRemoto = remotoPatterns.some((p) => p.test(bodyLower));
+
+    // Se encontrar Híbrido explicitamente, é Híbrido (mesmo que também mencione remoto)
+    if (ehHibrido) return 'Híbrido';
+    // Se encontrar Presencial explicitamente, é Presencial
+    if (ehPresencial) return 'Presencial';
+    // Se encontrar Remoto (e não encontrou Híbrido/Presencial), é Remoto
+    if (ehRemoto) return 'Remoto';
+
+    // Sem confiança suficiente para determinar
+    return null;
+  }
+
   /** Verifica se o título contém pelo menos um termo relevante (desenvolvedor, analista de sistemas, etc.) */
   private tituloEhRelevante(titulo: string): boolean {
     return this.termosRelevantes.some((regex) => regex.test(titulo));
@@ -487,16 +538,19 @@ export class LinkedInScraper {
         const bodyText = await page.textContent('body') || '';
         const bodyLower = bodyText.toLowerCase();
 
-        // Filtro de modelo (Double Check na página individual)
-        // Se a vaga for da busca remota, mas a página disser Presencial ou Híbrido, descarta.
-        if (vaga.tipoBusca === 'remoto') {
-          if (bodyLower.includes('presencial') || bodyLower.includes('on-site') || bodyLower.includes('on site') || bodyLower.includes('híbrido') || bodyLower.includes('hybrid')) {
-            // Verifica de forma mais flexível no pageText para evitar bugs com limites de palavras (\b)
-            const pageText = bodyText.replace(/\s+/g, ' ').toLowerCase();
-            if (pageText.includes(' presencial ') || pageText.includes(' híbrido ') || pageText.includes(' on-site ') || pageText.includes(' hybrid ')) {
-              console.log(`[Scraper] ❌ Vaga "${vaga.titulo}" (ID: ${vaga.id}) mentiu ser remota, mas é presencial/híbrida na página. Ignorando.`);
-              continue;
-            }
+        // Double Check do modelo de trabalho na página individual.
+        // Extrai o modelo real da página de detalhe (mais confiável que o card da lista).
+        // O LinkedIn exibe o modelo em elementos como badges, critérios, ou no body text.
+        const modeloReal = this.extrairModeloDaPagina(bodyLower);
+
+        if (modeloReal) {
+          // Atualiza o modelo da vaga com a informação mais confiável da página de detalhe
+          vaga.modelo = modeloReal;
+
+          // Se a vaga veio da busca remota mas a página confirma ser Híbrida ou Presencial, descarta
+          if (vaga.tipoBusca === 'remoto' && (modeloReal === 'Presencial' || modeloReal === 'Híbrido')) {
+            console.log(`[Scraper] ❌ Vaga "${vaga.titulo}" (ID: ${vaga.id}) classificada como ${modeloReal} na página de detalhe (busca era remota). Ignorando.`);
+            continue;
           }
         }
 

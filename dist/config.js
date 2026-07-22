@@ -25,4 +25,6 @@ exports.config = {
         .filter((kw) => kw.length > 0),
     databasePath: process.env.DATABASE_PATH || path_1.default.join(__dirname, '..', 'data', 'jobs.db'),
     scraperDelayMs: parseInt(process.env.SCRAPER_DELAY_MS || '5000', 10),
+    searchTimeHours: parseInt(process.env.SEARCH_TIME_HOURS || '1', 10),
+    maxApplicants: parseInt(process.env.MAX_APPLICANTS || '50', 10),
 };

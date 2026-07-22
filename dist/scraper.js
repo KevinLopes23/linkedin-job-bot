@@ -93,6 +93,10 @@ class LinkedInScraper {
         /\bpeoplesoft\b/i,
         /\btibco\b/i,
         /\boracle\b/i,
+        /\bprotheus\b/i,
+        // ── Empresas Bloqueadas ──
+        /\bbairesdev\b/i,
+        /\bhire\s+feed\b/i,
         // ── Cargos que contêm "developer" mas NÃO são de software ──
         /\bproposal\b/i,
         /\bbusiness\s+develop/i,
@@ -186,14 +190,14 @@ class LinkedInScraper {
         const urls = [];
         for (const keyword of config_1.config.searchKeywords) {
             const encoded = encodeURIComponent(keyword);
-            // 1. Brasil — Somente Remoto (f_WT=2), Júnior/Pleno, Última 1 hora
+            // 1. Brasil — Somente Remoto (f_WT=2), Júnior/Pleno/Sênior (f_E=2,3,4)
             urls.push({
-                url: `https://www.linkedin.com/jobs/search/?f_TPR=r3600&f_WT=2&geoId=106057199&f_E=2%2C3&keywords=${encoded}`,
+                url: `https://www.linkedin.com/jobs/search/?f_TPR=r${config_1.config.searchTimeHours * 3600}&f_WT=2&geoId=106057199&f_E=2%2C3%2C4&keywords=${encoded}`,
                 tipo: 'remoto',
             });
-            // 2. Bauru-SP — Presencial e Híbrido (f_WT=1,3), Júnior/Pleno, Última 1 hora
+            // 2. Bauru-SP — Presencial e Híbrido (f_WT=1,3), Júnior/Pleno/Sênior (f_E=2,3,4)
             urls.push({
-                url: `https://www.linkedin.com/jobs/search/?f_TPR=r3600&f_WT=1%2C3&geoId=104741620&f_E=2%2C3&keywords=${encoded}`,
+                url: `https://www.linkedin.com/jobs/search/?f_TPR=r${config_1.config.searchTimeHours * 3600}&f_WT=1%2C3&location=Bauru%2C%20S%C3%A3o%20Paulo%2C%20Brasil&f_E=2%2C3%2C4&keywords=${encoded}`,
                 tipo: 'bauru',
             });
         }
@@ -291,6 +295,54 @@ class LinkedInScraper {
         // Fallback baseado no tipo de busca
         return tipoBusca === 'remoto' ? 'Remoto' : 'Presencial';
     }
+    /**
+     * Extrai o modelo de trabalho real a partir do texto completo da página de detalhe da vaga.
+     * Mais confiável que a extração do card pois a página de detalhe contém badges e critérios explícitos.
+     * Usa prioridade Presencial > Híbrido > Remoto para evitar falsos positivos
+     * (ex: descrição menciona "remoto" mas o modelo real é Híbrido).
+     *
+     * Procura por padrões comuns do LinkedIn como:
+     * - "Trabalho remoto", "Modelo: Remoto", "Remote"
+     * - "Híbrido", "Hybrid"
+     * - "Presencial", "On-site"
+     *
+     * Retorna null se não conseguir determinar o modelo com confiança.
+     */
+    extrairModeloDaPagina(bodyLower) {
+        // Padrões específicos do LinkedIn para modelo de trabalho
+        // Esses padrões aparecem em badges/tags na página de detalhe
+        const presencialPatterns = [
+            /\bpresencial\b/,
+            /\bon-site\b/,
+            /\bon site\b/,
+        ];
+        const hibridoPatterns = [
+            /\bhíbrido\b/,
+            /\bhybrid\b/,
+        ];
+        const remotoPatterns = [
+            /\bremoto\b/,
+            /\bremote\b/,
+            /\btrabalho remoto\b/,
+        ];
+        // Prioridade: Presencial > Híbrido > Remoto
+        // Essa ordem evita falsos positivos: se a página diz "Híbrido" E "remoto"
+        // (ex: "Híbrido com possibilidade de remoto"), o correto é classificar como Híbrido.
+        const ehPresencial = presencialPatterns.some((p) => p.test(bodyLower));
+        const ehHibrido = hibridoPatterns.some((p) => p.test(bodyLower));
+        const ehRemoto = remotoPatterns.some((p) => p.test(bodyLower));
+        // Se encontrar Híbrido explicitamente, é Híbrido (mesmo que também mencione remoto)
+        if (ehHibrido)
+            return 'Híbrido';
+        // Se encontrar Presencial explicitamente, é Presencial
+        if (ehPresencial)
+            return 'Presencial';
+        // Se encontrar Remoto (e não encontrou Híbrido/Presencial), é Remoto
+        if (ehRemoto)
+            return 'Remoto';
+        // Sem confiança suficiente para determinar
+        return null;
+    }
     /** Verifica se o título contém pelo menos um termo relevante (desenvolvedor, analista de sistemas, etc.) */
     tituloEhRelevante(titulo) {
         return this.termosRelevantes.some((regex) => regex.test(titulo));
@@ -354,11 +406,21 @@ class LinkedInScraper {
             if (tipoBusca === 'bauru' && !localizacao.toLowerCase().includes('bauru')) {
                 return;
             }
-            // Extrair modelo de trabalho
-            const modelo = this.extrairModelo(cardTexto, tipoBusca);
+            // Extrair modelo de trabalho verificando primeiro as tags/badges específicos do LinkedIn
+            const badges = card.find('.job-search-card__metadata span, .result-benefits__text, .job-search-card__location').text().toLowerCase();
+            let modelo = this.extrairModelo(cardTexto, tipoBusca); // Fallback padrão
+            if (badges.includes('presencial') || badges.includes('on-site') || badges.includes('on site')) {
+                modelo = 'Presencial';
+            }
+            else if (badges.includes('híbrido') || badges.includes('hybrid')) {
+                modelo = 'Híbrido';
+            }
+            else if (badges.includes('remoto') || badges.includes('remote')) {
+                modelo = 'Remoto';
+            }
             // 6. Filtro estrito de modelo: Para a busca nacional (remota), 
             // rejeita qualquer vaga que o LinkedIn marcou como Híbrida ou Presencial.
-            if (tipoBusca === 'remoto' && modelo !== 'Remoto') {
+            if (tipoBusca === 'remoto' && (modelo === 'Presencial' || modelo === 'Híbrido')) {
                 return;
             }
             // Extrair link da vaga e o ID
@@ -395,6 +457,7 @@ class LinkedInScraper {
                     localizacao: localizacao || (tipoBusca === 'bauru' ? 'Bauru, SP' : 'Brasil'),
                     modelo,
                     link: urlSemParametros,
+                    tipoBusca,
                 });
             }
         });
@@ -425,28 +488,50 @@ class LinkedInScraper {
         const vagasVerificadas = [];
         for (const vaga of vagas) {
             try {
-                await page.goto(vaga.link, { waitUntil: 'domcontentloaded', timeout: 20000 });
-                await this.delay(2000);
+                await page.goto(vaga.link, { waitUntil: 'networkidle', timeout: 20000 }).catch(() => { });
+                // Fallback wait para garantir renderização de elementos dinâmicos
+                await page.waitForTimeout(1500);
                 const pageHtml = await page.content();
                 const pageHtmlLower = pageHtml.toLowerCase();
                 const bodyText = await page.textContent('body') || '';
                 const bodyLower = bodyText.toLowerCase();
-                const ehPromovida = 
-                // Texto visível específico do LinkedIn (PT e EN)
-                bodyLower.includes('promovida por quem') ||
-                    bodyLower.includes('promoted by job') ||
-                    // Classes CSS e atributos HTML de vagas patrocinadas
-                    pageHtmlLower.includes('promoted-badge') ||
-                    pageHtmlLower.includes('is-promoted') ||
-                    pageHtmlLower.includes('data-promoted') ||
-                    pageHtmlLower.includes('job-details-premium');
-                if (ehPromovida) {
-                    console.log(`[Scraper] ❌ Vaga "${vaga.titulo}" (ID: ${vaga.id}) é promovida. Ignorando.`);
+                // Double Check do modelo de trabalho na página individual.
+                // Extrai o modelo real da página de detalhe (mais confiável que o card da lista).
+                // O LinkedIn exibe o modelo em elementos como badges, critérios, ou no body text.
+                const modeloReal = this.extrairModeloDaPagina(bodyLower);
+                if (modeloReal) {
+                    // Atualiza o modelo da vaga com a informação mais confiável da página de detalhe
+                    vaga.modelo = modeloReal;
+                    // Se a vaga veio da busca remota mas a página confirma ser Híbrida ou Presencial, descarta
+                    if (vaga.tipoBusca === 'remoto' && (modeloReal === 'Presencial' || modeloReal === 'Híbrido')) {
+                        console.log(`[Scraper] ❌ Vaga "${vaga.titulo}" (ID: ${vaga.id}) classificada como ${modeloReal} na página de detalhe (busca era remota). Ignorando.`);
+                        continue;
+                    }
                 }
-                else {
-                    console.log(`[Scraper] ✅ Vaga "${vaga.titulo}" (ID: ${vaga.id}) verificada — não é promovida.`);
-                    vagasVerificadas.push(vaga);
+                // Filtro de quantidade máxima de candidatos
+                if (config_1.config.maxApplicants > 0) {
+                    const applicantRegex = /(\d+)\s+(pessoas clicaram em|candidatura|applicant)/i;
+                    const match = bodyLower.match(applicantRegex);
+                    if (!match) {
+                        const matchMaisDe = bodyLower.match(/mais de (\d+)\s+(candidatura|applicant)/i) || bodyLower.match(/over (\d+)\s+applicant/i);
+                        if (matchMaisDe) {
+                            const numApplicants = parseInt(matchMaisDe[1], 10);
+                            if (numApplicants > config_1.config.maxApplicants) {
+                                console.log(`[Scraper] ❌ Vaga "${vaga.titulo}" (ID: ${vaga.id}) tem muitos candidatos (mais de ${numApplicants}). Limite: ${config_1.config.maxApplicants}. Ignorando.`);
+                                continue;
+                            }
+                        }
+                    }
+                    else {
+                        const numApplicants = parseInt(match[1], 10);
+                        if (numApplicants > config_1.config.maxApplicants) {
+                            console.log(`[Scraper] ❌ Vaga "${vaga.titulo}" (ID: ${vaga.id}) tem muitos candidatos (${numApplicants}). Limite: ${config_1.config.maxApplicants}. Ignorando.`);
+                            continue;
+                        }
+                    }
                 }
+                console.log(`[Scraper] ✅ Vaga "${vaga.titulo}" (ID: ${vaga.id}) verificada — aprovada.`);
+                vagasVerificadas.push(vaga);
             }
             catch (err) {
                 console.error(`[Scraper] Erro ao verificar vaga ${vaga.id}: ${err.message}. Ignorando por segurança.`);
