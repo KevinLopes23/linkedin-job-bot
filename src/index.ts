@@ -21,6 +21,9 @@ async function executarFluxoScraping() {
     const vagasEncontradas = await scraper.verificarPromovidas(vagasCandidatas);
     console.log(`[Orquestrador] ${vagasEncontradas.length} vagas aprovadas após verificação individual.`);
 
+    // ── Filtro anti-spam: limitar vagas por empresa ──
+    // Agrupa vagas por empresa para aplicar o limite por ciclo
+    const vagasPorEmpresa = new Map<string, number>();
     let novasVagasContador = 0;
 
     for (const vaga of vagasEncontradas) {
@@ -30,12 +33,29 @@ async function executarFluxoScraping() {
           continue;
         }
 
-        // Se for nova, envia para o Telegram e salva no SQLite
+        // Filtro anti-spam: limite por empresa no ciclo atual
+        const empresaKey = vaga.empresa.toLowerCase().trim();
+        const contadorCiclo = vagasPorEmpresa.get(empresaKey) || 0;
+
+        if (contadorCiclo >= config.maxVagasPorEmpresa) {
+          console.log(`[Orquestrador] ⚠️ Empresa "${vaga.empresa}" já atingiu o limite de ${config.maxVagasPorEmpresa} vagas neste ciclo. Ignorando: "${vaga.titulo}" (ID: ${vaga.id})`);
+          continue;
+        }
+
+        // Filtro anti-spam: verificar histórico no banco (últimas 24h)
+        const vagasRecentes = await dbService.contarVagasRecentes(vaga.empresa, 24);
+        if (vagasRecentes >= config.maxVagasPorEmpresa) {
+          console.log(`[Orquestrador] ⚠️ Empresa "${vaga.empresa}" já tem ${vagasRecentes} vagas nas últimas 24h (limite: ${config.maxVagasPorEmpresa}). Ignorando: "${vaga.titulo}" (ID: ${vaga.id})`);
+          continue;
+        }
+
+        // Se passou em todos os filtros, envia para o Telegram e salva no SQLite
         console.log(`[Orquestrador] Nova vaga encontrada: ${vaga.titulo} em ${vaga.empresa} (ID: ${vaga.id})`);
         
         const enviado = await telegramService.enviarNotificacao(vaga);
         if (enviado) {
-          await dbService.salvarVaga(vaga.id);
+          await dbService.salvarVaga(vaga.id, vaga.empresa);
+          vagasPorEmpresa.set(empresaKey, contadorCiclo + 1);
           novasVagasContador++;
         }
 

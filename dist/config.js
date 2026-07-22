@@ -27,4 +27,5 @@ exports.config = {
     scraperDelayMs: parseInt(process.env.SCRAPER_DELAY_MS || '5000', 10),
     searchTimeHours: parseInt(process.env.SEARCH_TIME_HOURS || '1', 10),
     maxApplicants: parseInt(process.env.MAX_APPLICANTS || '50', 10),
+    maxVagasPorEmpresa: parseInt(process.env.MAX_VAGAS_POR_EMPRESA || '3', 10),
 };

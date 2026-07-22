@@ -24,9 +24,17 @@ export class DatabaseService {
     await this.db.exec(`
       CREATE TABLE IF NOT EXISTS vagas (
         id_vaga TEXT PRIMARY KEY,
+        empresa TEXT NOT NULL DEFAULT '',
         data_envio TEXT NOT NULL
       )
     `);
+
+    // Migração: adicionar coluna 'empresa' se não existir (para DBs antigos)
+    try {
+      await this.db.exec(`ALTER TABLE vagas ADD COLUMN empresa TEXT NOT NULL DEFAULT ''`);
+    } catch {
+      // Coluna já existe — ignorar
+    }
 
     console.log(`[Database] Banco de dados inicializado em: ${config.databasePath}`);
   }
@@ -40,14 +48,31 @@ export class DatabaseService {
     return !!row;
   }
 
-  async salvarVaga(idVaga: string): Promise<void> {
+  async salvarVaga(idVaga: string, empresa: string = ''): Promise<void> {
     if (!this.db) {
       throw new Error('Banco de dados não inicializado. Chame o método init() primeiro.');
     }
 
     const dataEnvio = new Date().toISOString();
-    await this.db.run('INSERT INTO vagas (id_vaga, data_envio) VALUES (?, ?)', [idVaga, dataEnvio]);
-    console.log(`[Database] Vaga salva: ${idVaga}`);
+    await this.db.run('INSERT INTO vagas (id_vaga, empresa, data_envio) VALUES (?, ?, ?)', [idVaga, empresa, dataEnvio]);
+    console.log(`[Database] Vaga salva: ${idVaga} (${empresa})`);
+  }
+
+  /**
+   * Conta quantas vagas de uma empresa foram salvas nas últimas N horas.
+   * Usado para detectar empresas-spam que postam muitas vagas de uma vez.
+   */
+  async contarVagasRecentes(empresa: string, horas: number): Promise<number> {
+    if (!this.db) {
+      throw new Error('Banco de dados não inicializado. Chame o método init() primeiro.');
+    }
+
+    const limite = new Date(Date.now() - horas * 60 * 60 * 1000).toISOString();
+    const row = await this.db.get(
+      'SELECT COUNT(*) as total FROM vagas WHERE empresa = ? AND data_envio >= ?',
+      [empresa, limite]
+    );
+    return row?.total || 0;
   }
 
   async fechar(): Promise<void> {
