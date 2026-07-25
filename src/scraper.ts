@@ -305,8 +305,8 @@ export class LinkedInScraper {
       return 'Presencial';
     }
 
-    // Fallback baseado no tipo de busca
-    return tipoBusca === 'remoto' ? 'Remoto' : 'Presencial';
+    // Sem modelo explícito encontrado — será verificado na página de detalhe
+    return 'Indefinido';
   }
 
   /**
@@ -551,6 +551,32 @@ export class LinkedInScraper {
           if (vaga.tipoBusca === 'remoto' && (modeloReal === 'Presencial' || modeloReal === 'Híbrido')) {
             console.log(`[Scraper] ❌ Vaga "${vaga.titulo}" (ID: ${vaga.id}) classificada como ${modeloReal} na página de detalhe (busca era remota). Ignorando.`);
             continue;
+          }
+        }
+
+        // Verificar se é vaga promovida/patrocinada na página de detalhe.
+        // Na view pública (sem login), vagas promovidas furam os filtros do LinkedIn
+        // (f_WT, etc.) e o indicador "Promovida" pode não aparecer no card da lista.
+        const ehPromovida =
+          bodyLower.includes('promovida por quem') ||
+          bodyLower.includes('promoted by job') ||
+          pageHtmlLower.includes('is-promoted') ||
+          pageHtmlLower.includes('__sponsored');
+
+        if (ehPromovida) {
+          console.log(`[Scraper] ❌ Vaga "${vaga.titulo}" (ID: ${vaga.id}) é promovida (detectado na página de detalhe). Ignorando.`);
+          continue;
+        }
+
+        // Se o modelo não pôde ser determinado nem pelo card nem pela página de detalhe
+        if (vaga.modelo === 'Indefinido') {
+          if (vaga.tipoBusca === 'remoto') {
+            // Para busca remota, rejeitar — alto risco de ser presencial/híbrida que furou o filtro
+            console.log(`[Scraper] ❌ Vaga "${vaga.titulo}" (ID: ${vaga.id}) sem modelo definido (busca remota). Ignorando por segurança.`);
+            continue;
+          } else {
+            // Para busca local (Bauru), assumir Presencial como padrão seguro
+            vaga.modelo = 'Presencial';
           }
         }
 
