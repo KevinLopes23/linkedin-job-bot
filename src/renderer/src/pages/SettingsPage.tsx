@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { Settings, SettingsView } from '../../../shared/types'
 import { Icon } from '../components/Icon'
 import { errorMessage } from '../lib/format'
@@ -88,18 +88,18 @@ export function SettingsPage({ initial, onSaved }: { initial: SettingsView; onSa
   const [status, setStatus] = useState<{ kind: 'ok' | 'erro'; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
 
-  useEffect(() => setForm(toForm(initial)), [initial])
-
   const set = <K extends keyof Form>(k: K, v: Form[K]): void => setForm((f) => ({ ...f, [k]: v }))
   const dirty = JSON.stringify(toSettings(form)) !== JSON.stringify(toSettings(toForm(view)))
 
-  const act = async (fn: () => Promise<SettingsView | void>, okText: string): Promise<void> => {
+  /** `resetForm`: só depois de salvar as configurações; salvar/remover a chave não mexe no que está sendo editado. */
+  const act = async (fn: () => Promise<SettingsView | void>, okText: string, resetForm = false): Promise<void> => {
     setBusy(true)
     setStatus(null)
     try {
       const next = await fn()
       if (next) {
         setView(next)
+        if (resetForm) setForm(toForm(next))
         onSaved(next)
       }
       setStatus({ kind: 'ok', text: okText })
@@ -266,7 +266,7 @@ export function SettingsPage({ initial, onSaved }: { initial: SettingsView; onSa
           type="button"
           className="btn btn--lume"
           disabled={busy || !dirty}
-          onClick={() => void act(() => window.vagalume.settings.save(toSettings(form)), 'Configurações salvas.')}
+          onClick={() => void act(() => window.vagalume.settings.save(toSettings(form)), 'Configurações salvas.', true)}
         >
           Salvar
         </button>
