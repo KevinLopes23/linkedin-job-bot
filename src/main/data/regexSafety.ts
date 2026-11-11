@@ -90,6 +90,3 @@ export function isSlowRegex(source: string, now: () => number = performance.now.
   }
   return false
 }
-
-/** Termo que pode travar o app (repetição dentro de repetição ou lento com entrada adversária). */
-export const isDangerousRegex = (source: string): boolean => hasNestedQuantifier(source) || isSlowRegex(source)

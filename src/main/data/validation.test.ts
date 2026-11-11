@@ -1,4 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { isSlowRegex } from './regexSafety'
+// Espia a checagem de tempo sem mudar o comportamento dela.
+vi.mock('./regexSafety', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./regexSafety')>()
+  return { ...actual, isSlowRegex: vi.fn(actual.isSlowRegex) }
+})
+
 import { DEFAULT_SETTINGS, parseJobId, parseJobs, parseNotes, parseSettings, parseStatus, parseStoredSettings } from './validation'
 
 describe('settings', () => {
@@ -33,6 +40,25 @@ describe('settings', () => {
     expect(() => parseSettings({ ...DEFAULT_SETTINGS, excludeTerms: ['(a|aa)+$'] })).toThrow(/pode travar o app/)
     expect(() => parseSettings({ ...DEFAULT_SETTINGS, titleTerms: ['((ab)+)+'] })).toThrow(/pode travar o app/)
     expect(parseSettings({ ...DEFAULT_SETTINGS, excludeTerms: ['(a{2})+'] }).excludeTerms).toEqual(['(a{2})+'])
+  })
+
+  describe('checagem de tempo das regex (R2-3)', () => {
+    beforeEach(() => {
+      vi.mocked(isSlowRegex).mockClear()
+    })
+
+    it('a LEITURA do settings.json não roda a checagem de tempo, só a estática', () => {
+      const s = parseStoredSettings({ excludeTerms: [String.raw`\bsenior\b`, '((ab)+)+'], resumeText: 'Kevin' })
+      expect(isSlowRegex).not.toHaveBeenCalled()
+      // termo com repetição aninhada no arquivo volta ao padrão só nesse campo; o resto fica
+      expect(s.excludeTerms).toEqual(DEFAULT_SETTINGS.excludeTerms)
+      expect(s.resumeText).toBe('Kevin')
+    })
+
+    it('o SALVAR (parseSettings) roda a checagem de tempo em todos os termos', () => {
+      parseSettings(DEFAULT_SETTINGS)
+      expect(isSlowRegex).toHaveBeenCalledTimes(DEFAULT_SETTINGS.titleTerms.length + DEFAULT_SETTINGS.excludeTerms.length)
+    })
   })
 
   it('recusa regex inválida com mensagem clara', () => {

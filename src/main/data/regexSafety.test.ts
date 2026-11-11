@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_EXCLUDE_TERMS, DEFAULT_TITLE_TERMS } from '../scan/filters'
-import { hasNestedQuantifier, isDangerousRegex, isSlowRegex } from './regexSafety'
+import { hasNestedQuantifier, isSlowRegex } from './regexSafety'
 
 const DEFAULTS = [...DEFAULT_TITLE_TERMS, ...DEFAULT_EXCLUDE_TERMS]
 
@@ -38,7 +38,7 @@ describe('isSlowRegex', () => {
 describe('termos padrão do bot', () => {
   it('todos aceitos, e a checagem inteira é rápida', () => {
     const start = performance.now()
-    expect(DEFAULTS.filter(isDangerousRegex)).toEqual([])
+    expect(DEFAULTS.filter((t) => hasNestedQuantifier(t) || isSlowRegex(t))).toEqual([])
     expect(performance.now() - start).toBeLessThan(1000)
   })
 })

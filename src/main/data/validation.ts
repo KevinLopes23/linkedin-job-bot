@@ -1,7 +1,7 @@
 /** Validação (zod) de tudo que entra pelo IPC ou vem dos arquivos locais. */
 import { z } from 'zod'
 import { JOB_STATUSES, type Job, type JobStatus, type ScanRecord, type Settings } from '../../shared/types'
-import { isDangerousRegex } from './regexSafety'
+import { hasNestedQuantifier, isSlowRegex } from './regexSafety'
 import { DEFAULT_CITIES, DEFAULT_EXCLUDE_TERMS, DEFAULT_KEYWORDS, DEFAULT_TITLE_TERMS } from '../scan/filters'
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -37,13 +37,17 @@ const cleanList = (max: number, itemMax: number) =>
     .transform((items) => [...new Set(items.map((i) => i.trim()).filter((i) => i.length > 0))])
     .pipe(z.array(z.string().max(itemMax)).max(max))
 
+const slowTermMessage = (term: string): string =>
+  `O termo "${term}" pode travar o app (repetição que demora demais para conferir). Simplifique o termo.`
+
 const regexList = cleanList(300, 200)
   .refine((items) => items.every(isValidRegex), {
     message: 'Há um termo que não é uma expressão válida. Confira parênteses e colchetes.'
   })
   .superRefine((items, ctx) => {
-    const bad = items.find(isDangerousRegex)
-    if (bad) ctx.addIssue({ code: 'custom', message: `O termo "${bad}" pode travar o app (repetição que demora demais para conferir). Simplifique o termo.` })
+    // Só a checagem estática aqui: este campo também valida a LEITURA do settings.json, que roda o tempo todo.
+    const bad = items.find(hasNestedQuantifier)
+    if (bad) ctx.addIssue({ code: 'custom', message: slowTermMessage(bad) })
   })
 
 const d = DEFAULT_SETTINGS
@@ -66,9 +70,17 @@ const settingsFields = {
   resumeText: z.string().max(40_000, 'Currículo muito longo (máx. 40 mil caracteres).').default(d.resumeText)
 }
 
+/**
+ * Configurações vindas do renderer (Salvar). A checagem de tempo das regex fica só aqui: na leitura do arquivo
+ * ela custaria a cada settings.get() e uma medição falsa voltaria os termos do Kevin ao padrão, calada.
+ */
 export const settingsSchema = z
   .object(settingsFields)
   .refine((s) => s.searchRemote || s.cities.length > 0, { message: 'Ative a busca remota ou informe ao menos uma cidade.' })
+  .superRefine((s, ctx) => {
+    const slow = [...s.titleTerms, ...s.excludeTerms].find((term) => isSlowRegex(term))
+    if (slow) ctx.addIssue({ code: 'custom', message: slowTermMessage(slow) })
+  })
 
 /** Configurações vindas do renderer: erro claro se inválidas. */
 export function parseSettings(raw: unknown): Settings {
