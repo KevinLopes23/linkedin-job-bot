@@ -49,7 +49,7 @@ const regexList = cleanList(300, 200)
 
 const d = DEFAULT_SETTINGS
 
-export const settingsSchema = z.object({
+const settingsFields = {
   keywords: cleanList(30, 80).refine((k) => k.length > 0, { message: 'Informe ao menos uma palavra-chave.' }).default([...d.keywords]),
   searchRemote: z.boolean().default(d.searchRemote),
   cities: cleanList(10, 120).default([...d.cities]),
@@ -65,7 +65,11 @@ export const settingsSchema = z.object({
   maxAiPerScan: z.number().int().min(0).max(100).default(d.maxAiPerScan),
   geminiModel: z.string().trim().regex(/^[a-z0-9.-]{3,60}$/, 'Modelo inválido.').default(d.geminiModel),
   resumeText: z.string().max(40_000, 'Currículo muito longo (máx. 40 mil caracteres).').default(d.resumeText)
-}).refine((s) => s.searchRemote || s.cities.length > 0, { message: 'Ative a busca remota ou informe ao menos uma cidade.' })
+}
+
+export const settingsSchema = z
+  .object(settingsFields)
+  .refine((s) => s.searchRemote || s.cities.length > 0, { message: 'Ative a busca remota ou informe ao menos uma cidade.' })
 
 /** Configurações vindas do renderer: erro claro se inválidas. */
 export function parseSettings(raw: unknown): Settings {
@@ -74,10 +78,19 @@ export function parseSettings(raw: unknown): Settings {
   return result.data
 }
 
-/** Configurações do arquivo: o que não validar volta ao padrão. */
+/**
+ * Configurações do arquivo, campo a campo: só o campo que não validar volta ao padrão.
+ * Assim um limite que muda numa versão nova nunca apaga o currículo nem as outras escolhas.
+ */
 export function parseStoredSettings(raw: unknown): Settings {
-  const result = settingsSchema.safeParse(raw)
-  return result.success ? result.data : DEFAULT_SETTINGS
+  const stored = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {}
+  const fields = Object.fromEntries(
+    Object.entries(settingsFields).map(([key, schema]) => {
+      const result = schema.safeParse(stored[key])
+      return [key, result.success ? result.data : DEFAULT_SETTINGS[key as keyof Settings]]
+    })
+  ) as unknown as Settings
+  return fields.searchRemote || fields.cities.length > 0 ? fields : { ...fields, searchRemote: true }
 }
 
 const statusSchema = z.enum(JOB_STATUSES)

@@ -13,8 +13,14 @@ describe('settings', () => {
     expect(parseStoredSettings({ maxApplicants: 10 }).maxApplicants).toBe(10)
   })
 
-  it('arquivo inválido volta ao padrão', () => {
-    expect(parseStoredSettings({ hoursWindow: -3 })).toEqual(DEFAULT_SETTINGS)
+  it('campo inválido no arquivo volta ao padrão só nele (o currículo nunca some)', () => {
+    const s = parseStoredSettings({ hoursWindow: -3, maxAiPerScan: 999, resumeText: 'Kevin, React e Node', keywords: ['Node'] })
+    expect(s).toEqual({ ...DEFAULT_SETTINGS, resumeText: 'Kevin, React e Node', keywords: ['Node'] })
+  })
+
+  it('arquivo que não é objeto volta ao padrão; sem remoto e sem cidade liga o remoto', () => {
+    expect(parseStoredSettings('lixo')).toEqual(DEFAULT_SETTINGS)
+    expect(parseStoredSettings({ searchRemote: false, cities: [] })).toMatchObject({ searchRemote: true, cities: [] })
   })
 
   it('limpa listas: trim, sem vazios, sem repetidos', () => {
