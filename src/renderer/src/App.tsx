@@ -2,8 +2,9 @@ import { useEffect, useState, type ReactElement } from 'react'
 import type { PageId } from '../../shared/ipc'
 import { Fireflies } from './components/Fireflies'
 import { Icon, type IconName } from './components/Icon'
+import { LoadError } from './components/LoadError'
 import { Logo } from './components/Logo'
-import { useJobs, useScanHistory, useScanStatus, useSettings } from './hooks/useData'
+import { useJobs, useScanHistory, useScanStatus, useSettings, type Live } from './hooks/useData'
 import { BoardPage } from './pages/BoardPage'
 import { HomePage } from './pages/HomePage'
 import { JobsPage } from './pages/JobsPage'
@@ -23,10 +24,10 @@ const isPageId = (value: string): value is PageId => NAV.some((n) => n.id === va
 export function App() {
   const [page, setPage] = useState<PageId>('inicio')
   const [version, setVersion] = useState('')
-  const [jobs, setJobs] = useJobs()
+  const jobs = useJobs()
   const scan = useScanStatus()
   const history = useScanHistory()
-  const [settings, setSettings] = useSettings()
+  const settings = useSettings()
 
   useEffect(() => {
     window.vagalume.app.version().then(setVersion, () => setVersion(''))
@@ -35,21 +36,34 @@ export function App() {
     })
   }, [])
 
-  const list = jobs ?? []
+  const list = jobs.data ?? []
   const newCount = list.filter((j) => j.status === 'nova').length
 
+  // Dados de que cada tela depende: se a carga falhou, a tela mostra o erro em vez de "vazio".
+  const sources: Record<PageId, ReadonlyArray<Pick<Live<unknown>, 'error' | 'retry'>>> = {
+    inicio: [jobs, scan],
+    vagas: [jobs],
+    candidaturas: [jobs],
+    varredura: [scan, history],
+    configuracoes: [settings]
+  }
+  const failed = sources[page].filter((s) => s.error !== null)
+
   const content = ((): ReactElement => {
+    if (failed.length > 0) {
+      return <LoadError message={failed.map((s) => s.error).join(' ')} onRetry={() => failed.forEach((s) => s.retry())} />
+    }
     switch (page) {
       case 'inicio':
-        return <HomePage jobs={list} scan={scan} onNavigate={setPage} />
+        return <HomePage jobs={list} scan={scan.data} onNavigate={setPage} />
       case 'vagas':
         return <JobsPage jobs={list} />
       case 'candidaturas':
-        return <BoardPage jobs={list} setJobs={setJobs} />
+        return <BoardPage jobs={list} setJobs={jobs.setData} />
       case 'varredura':
-        return <ScanPage scan={scan} history={history ?? []} />
+        return <ScanPage scan={scan.data} history={history.data ?? []} />
       case 'configuracoes':
-        return settings ? <SettingsPage initial={settings} onSaved={setSettings} /> : <div className="page" />
+        return settings.data ? <SettingsPage initial={settings.data} onSaved={settings.setData} /> : <div className="page" />
     }
   })()
 
@@ -73,7 +87,7 @@ export function App() {
                 <Icon name={item.icon} />
                 <span>{item.label}</span>
                 {item.id === 'vagas' && newCount > 0 && <span className="nav__badge">{newCount}</span>}
-                {item.id === 'varredura' && scan?.running && <span className="nav__pulse" aria-label="varrendo" />}
+                {item.id === 'varredura' && scan.data?.running && <span className="nav__pulse" aria-label="varrendo" />}
               </button>
             </li>
           ))}

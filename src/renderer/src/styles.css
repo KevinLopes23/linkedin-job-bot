@@ -1376,6 +1376,17 @@ button {
   color: var(--ember);
 }
 
+/* ───────── Erro de carga ───────── */
+.load-error {
+  margin-top: var(--s-8);
+  border: 1px solid rgba(255, 154, 115, 0.35);
+  border-radius: var(--r-lg);
+  background: rgba(9, 14, 34, 0.85);
+}
+.load-error .empty__text {
+  color: var(--ember);
+}
+
 /* ───────── Estado vazio ───────── */
 .empty {
   display: grid;
