@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { JOB_STATUSES, type Job } from '../../../shared/types'
-import { dateTime, errorMessage, glow, STATUS_LABEL } from '../lib/format'
+import { dateTime, errorMessage, glow, modelLabel, STATUS_LABEL } from '../lib/format'
 import { Icon } from './Icon'
 import { ScoreRing } from './ScoreRing'
 
@@ -61,7 +61,7 @@ export function JobDetail({ job, onClose }: { job: Job; onClose: () => void }) {
         <div className="detail__title">
           <h2>{job.title}</h2>
           <p>
-            {job.company} · {job.model} · {job.location}
+            {job.company} · {modelLabel(job.model)} · {job.location}
           </p>
         </div>
         <button type="button" className="icon-btn" onClick={onClose} aria-label="Fechar detalhes">

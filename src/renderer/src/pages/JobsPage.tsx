@@ -4,6 +4,7 @@ import { EmptyState } from '../components/EmptyState'
 import { Icon } from '../components/Icon'
 import { JobCard } from '../components/JobCard'
 import { JobDetail } from '../components/JobDetail'
+import { matchesModel } from '../lib/format'
 
 type Sort = 'nota' | 'recentes'
 type ModelFilter = 'todos' | WorkModel
@@ -21,7 +22,7 @@ export function JobsPage({ jobs }: { jobs: readonly Job[] }) {
     const q = query.trim().toLowerCase()
     return jobs
       .filter((j) => (hideDiscarded ? j.status !== 'descartada' : true))
-      .filter((j) => (model === 'todos' ? true : j.model === model))
+      .filter((j) => (model === 'todos' ? true : matchesModel(j.model, model)))
       .filter((j) => (q ? `${j.title} ${j.company} ${j.location}`.toLowerCase().includes(q) : true))
       .sort((a, b) =>
         sort === 'nota'

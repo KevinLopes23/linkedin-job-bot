@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { errorMessage, glow, scoreTone, timeAgo, timeUntil } from './format'
+import { errorMessage, glow, matchesModel, modelLabel, scoreTone, timeAgo, timeUntil } from './format'
 
 const now = Date.parse('2026-11-11T12:00:00.000Z')
 
@@ -30,5 +30,14 @@ describe('format', () => {
 
   it('limpa o prefixo do erro do IPC', () => {
     expect(errorMessage(new Error("Error invoking remote method 'jobs:move': Error: Coluna inválida."))).toBe('Coluna inválida.')
+  })
+
+  it('vaga da cidade sem modelo escrito aparece como "Presencial ou híbrido" e nos dois filtros (B2)', () => {
+    expect(modelLabel('Indefinido')).toBe('Presencial ou híbrido')
+    expect(modelLabel('Remoto')).toBe('Remoto')
+    expect(matchesModel('Indefinido', 'Presencial')).toBe(true)
+    expect(matchesModel('Indefinido', 'Híbrido')).toBe(true)
+    expect(matchesModel('Indefinido', 'Remoto')).toBe(false)
+    expect(matchesModel('Híbrido', 'Presencial')).toBe(false)
   })
 })

@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { Job } from '../../../shared/types'
-import { glow, scoreTone, STATUS_LABEL, timeAgo } from '../lib/format'
+import { glow, modelLabel, scoreTone, STATUS_LABEL, timeAgo } from '../lib/format'
 import { Icon } from './Icon'
 import { ScoreRing } from './ScoreRing'
 
@@ -22,7 +22,7 @@ export function JobCard({ job, onOpen, selected = false, index = 0 }: { job: Job
         <span className="job__meta">
           <span className="chip">
             <Icon name="pin" size={13} />
-            {job.model} · {job.location}
+            {modelLabel(job.model)} · {job.location}
           </span>
           {job.applicants !== null && (
             <span className="chip">

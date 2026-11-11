@@ -1,4 +1,4 @@
-import type { JobStatus } from '../../../shared/types'
+import type { JobStatus, WorkModel } from '../../../shared/types'
 
 export const STATUS_LABEL: Record<JobStatus, string> = {
   nova: 'Nova',
@@ -7,6 +7,13 @@ export const STATUS_LABEL: Record<JobStatus, string> = {
   entrevista: 'Entrevista',
   descartada: 'Descartada'
 }
+
+/** Indefinido só sobra na busca por cidade, que pega presencial e híbrido. */
+export const modelLabel = (model: WorkModel): string => (model === 'Indefinido' ? 'Presencial ou híbrido' : model)
+
+/** Filtro por modelo: vaga sem modelo escrito (busca por cidade) entra em Presencial e em Híbrido. */
+export const matchesModel = (model: WorkModel, filter: WorkModel): boolean =>
+  model === filter || (model === 'Indefinido' && (filter === 'Presencial' || filter === 'Híbrido'))
 
 /** Mensagem limpa de um erro vindo do IPC (sem o prefixo técnico do Electron). */
 export function errorMessage(error: unknown): string {

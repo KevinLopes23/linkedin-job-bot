@@ -14,6 +14,7 @@ import {
 } from './filters'
 
 const MAX_DESCRIPTION_CHARS = 8_000
+const MAX_CARD_TEXT = 500
 
 export interface Candidate {
   readonly id: string
@@ -52,7 +53,8 @@ export function parseSearchHtml(html: string, search: Pick<SearchUrl, 'kind' | '
 
   cards.each((_, element) => {
     const card = $(element)
-    const cardText = card.text()
+    // Só o começo do card entra nas regex do usuário (limita o custo de uma regex mal escrita).
+    const cardText = card.text().replace(/\s+/g, ' ').slice(0, MAX_CARD_TEXT)
     if (isPromotedCard(cardText, card.html() ?? '')) return
 
     const title = card.find('.base-search-card__title, .job-search-card__title, h3, h4').first().text().trim()
@@ -131,9 +133,10 @@ export function checkDetail(html: string, candidate: Candidate, maxApplicants: n
     return { ok: false, reason: `é ${model} na página da vaga (busca remota)` }
   }
   if (isPromotedDetail(jobText, jobHtml)) return { ok: false, reason: 'é promovida' }
-  // Sem modelo escrito na vaga: vale o filtro da busca (f_WT=2 remoto; cidade = presencial/híbrido).
-  // A página pública raramente diz "Remoto" na área da vaga; o bot só aprovava porque lia "vagas semelhantes".
-  if (model === 'Indefinido') model = candidate.searchKind === 'remoto' ? 'Remoto' : 'Presencial'
+  // Sem modelo escrito na vaga: na busca remota vale o filtro dela (f_WT=2). A página pública raramente diz
+  // "Remoto" na área da vaga; o bot só aprovava porque lia "vagas semelhantes". Na busca por cidade (f_WT=1,3)
+  // pode ser presencial ou híbrido, então fica Indefinido (a tela mostra "Presencial ou híbrido").
+  if (model === 'Indefinido' && candidate.searchKind === 'remoto') model = 'Remoto'
   const applicants = parseApplicants(jobText)
   if (maxApplicants > 0 && applicants !== null && applicants > maxApplicants) {
     return { ok: false, reason: `tem ${applicants} candidatos (limite ${maxApplicants})` }
