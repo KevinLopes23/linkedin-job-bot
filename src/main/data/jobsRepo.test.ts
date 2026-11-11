@@ -80,13 +80,13 @@ describe('JobsRepo', () => {
 })
 
 describe('ScanHistoryRepo', () => {
-  it('guarda as últimas 50, a mais nova primeiro', () => {
+  it('guarda só as últimas N (padrão 50), a mais nova primeiro', () => {
     dir = mkdtempSync(join(tmpdir(), 'vagalume-scans-'))
-    const h = new ScanHistoryRepo(new JsonFile<ScanRecord[]>(join(dir, 'scans.json'), parseScanHistory, () => []))
-    for (let i = 0; i < 55; i++) {
+    const file = new JsonFile<ScanRecord[]>(join(dir, 'scans.json'), parseScanHistory, () => [])
+    const h = new ScanHistoryRepo(file, 3)
+    for (let i = 0; i < 5; i++) {
       h.add({ startedAt: `t${i}`, finishedAt: `t${i}`, cards: i, candidates: 0, added: 0, analyzed: 0, error: null })
     }
-    expect(h.list()).toHaveLength(50)
-    expect(h.list()[0]?.cards).toBe(54)
+    expect(h.list().map((r) => r.cards)).toEqual([4, 3, 2])
   })
 })

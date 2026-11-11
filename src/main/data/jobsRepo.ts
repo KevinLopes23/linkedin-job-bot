@@ -70,13 +70,16 @@ export class JobsRepo {
 }
 
 export class ScanHistoryRepo {
-  constructor(private readonly file: JsonFile<ScanRecord[]>) {}
+  constructor(
+    private readonly file: JsonFile<ScanRecord[]>,
+    private readonly max = MAX_SCAN_RECORDS
+  ) {}
 
   list(): ScanRecord[] {
     return this.file.read()
   }
 
   add(record: ScanRecord): ScanRecord[] {
-    return this.file.update((current) => [record, ...current].slice(0, MAX_SCAN_RECORDS))
+    return this.file.update((current) => [record, ...current].slice(0, this.max))
   }
 }
