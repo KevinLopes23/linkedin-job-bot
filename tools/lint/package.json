@@ -1,0 +1,13 @@
+{
+  "name": "vagalume-lint",
+  "private": true,
+  "description": "Ferramentas de lint isoladas: o typescript-eslint ainda exige TypeScript < 6.1 e o app usa TypeScript 7 (sem a API JS antiga).",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.72.2"
+  }
+}
