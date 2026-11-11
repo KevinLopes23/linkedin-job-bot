@@ -184,7 +184,7 @@ export function SettingsPage({ initial, onSaved }: { initial: SettingsView; onSa
             <button
               type="button"
               className="btn btn--ghost"
-              disabled={busy || !view.hasGeminiKey}
+              disabled={busy || (!view.hasGeminiKey && !view.geminiKeyUnreadable)}
               onClick={() => void act(() => window.vagalume.settings.clearGeminiKey(), 'Chave removida.')}
             >
               Remover chave
