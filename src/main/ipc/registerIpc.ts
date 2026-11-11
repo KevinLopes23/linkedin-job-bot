@@ -7,9 +7,8 @@ import { GeminiClient } from '../ai/gemini'
 import type { JobsRepo, ScanHistoryRepo } from '../data/jobsRepo'
 import { parseJobId, parseNotes, parseStatus } from '../data/validation'
 import type { ScanService } from '../scan/scanService'
+import { pdfToText } from '../settings/resumePdf'
 import type { SettingsService } from '../settings/settingsService'
-
-const MAX_PDF_BYTES = 10 * 1024 * 1024
 
 export interface IpcDeps {
   readonly settings: SettingsService
@@ -46,14 +45,7 @@ async function importResumePdf(): Promise<string | null> {
   const result = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options)
   const path = result.filePaths[0]
   if (result.canceled || !path) return null
-  const buffer = await readFile(path)
-  if (buffer.byteLength > MAX_PDF_BYTES) throw new Error('PDF muito grande (máx. 10 MB).')
-  const { extractText, getDocumentProxy } = await import('unpdf')
-  const pdf = await getDocumentProxy(new Uint8Array(buffer))
-  const { text } = await extractText(pdf, { mergePages: true })
-  const clean = text.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
-  if (!clean) throw new Error('Não encontrei texto no PDF (pode ser imagem escaneada). Cole o texto do currículo.')
-  return clean.slice(0, 40_000)
+  return pdfToText(new Uint8Array(await readFile(path)))
 }
 
 async function analyzeOne({ settings, jobs }: IpcDeps, id: string): Promise<readonly Job[]> {
