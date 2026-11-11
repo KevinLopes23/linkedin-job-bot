@@ -54,6 +54,21 @@ describe('SettingsService · chave do Gemini', () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     secrets.write({ geminiKey: Buffer.from('cifrada-em-outro-perfil').toString('base64') })
     expect(settings.view()).toMatchObject({ hasGeminiKey: false, geminiKeyUnreadable: true })
-    expect(log).toHaveBeenCalled()
+    expect(log).toHaveBeenCalledOnce()
+  })
+
+  it('loga a chave ilegível uma vez só, e de novo depois que uma chave nova é salva (N4)', () => {
+    const { settings, secrets } = service()
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const broken = { geminiKey: Buffer.from('cifrada-em-outro-perfil').toString('base64') }
+    secrets.write(broken)
+    for (let i = 0; i < 5; i++) settings.view()
+    settings.getGeminiKey()
+    expect(log).toHaveBeenCalledTimes(1)
+    settings.setGeminiKey('AIzaSyFakeKeyForTests_1234567890')
+    secrets.write(broken)
+    settings.view()
+    settings.view()
+    expect(log).toHaveBeenCalledTimes(2)
   })
 })

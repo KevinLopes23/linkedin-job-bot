@@ -17,6 +17,9 @@ export function parseSecrets(raw: unknown): Secrets {
 }
 
 export class SettingsService {
+  /** A falha de decifrar a chave vai para o log uma vez só (view/varredura chamam isso o tempo todo). */
+  private unreadableLogged = false
+
   constructor(
     private readonly file: JsonFile<Settings>,
     private readonly secrets: JsonFile<Secrets>,
@@ -46,11 +49,13 @@ export class SettingsService {
       throw new Error('A criptografia do Windows não está disponível; a chave não foi salva.')
     }
     this.secrets.write({ geminiKey: safeStorage.encryptString(key).toString('base64') })
+    this.unreadableLogged = false
     return this.view()
   }
 
   clearGeminiKey(): SettingsView {
     this.secrets.write({})
+    this.unreadableLogged = false
     return this.view()
   }
 
@@ -60,7 +65,10 @@ export class SettingsService {
     try {
       return safeStorage.decryptString(Buffer.from(stored, 'base64'))
     } catch (error) {
-      console.error('[settings] A chave do Gemini está salva mas não pôde ser decifrada:', error instanceof Error ? error.message : error)
+      if (!this.unreadableLogged) {
+        this.unreadableLogged = true
+        console.error('[settings] A chave do Gemini está salva mas não pôde ser decifrada:', error instanceof Error ? error.message : error)
+      }
       return null
     }
   }
