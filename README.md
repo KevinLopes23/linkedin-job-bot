@@ -1,96 +1,106 @@
 <div align="center">
 
-# 🔎 LinkedIn Job Bot
+<img src="build/icon.png" width="112" alt="Vagalume" />
 
-**Bot que vasculha o LinkedIn a cada hora, filtra vagas promovidas e fora do perfil, e manda só as boas para o seu Telegram.**
+# Vagalume
 
-![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+**Acende as vagas que valem a pena.**
+App desktop para Windows que varre o LinkedIn, descarta o que foge do seu perfil, dá uma nota de match com o seu currículo e organiza suas candidaturas.
+
+![Electron](https://img.shields.io/badge/Electron-47848F?style=for-the-badge&logo=electron&logoColor=white)
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
 ![Playwright](https://img.shields.io/badge/Playwright-2EAD33?style=for-the-badge&logo=playwright&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
-![Telegram](https://img.shields.io/badge/Telegram-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Gemini](https://img.shields.io/badge/Gemini-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white)
 
 </div>
 
----
+<p align="center"><img src="docs/media/inicio.png" alt="Tela inicial do Vagalume" width="860" /></p>
 
-## 💡 Sobre
+## O que ele faz
 
-Procurar vaga no LinkedIn é rolar dezenas de anúncios promovidos, cargos sênior, stacks que você não usa e vagas com centenas de candidatos. Este bot faz a busca por você: abre as páginas de busca públicas com Playwright, aplica uma bateria de filtros, confere cada vaga individualmente e envia para o Telegram apenas as que passaram — sem repetir nenhuma.
+Procurar vaga no LinkedIn é rolar dezenas de anúncios promovidos, cargos sênior, stacks que você não usa e vagas com centenas de candidatos. O Vagalume faz a busca por você, com o app aberto ou na bandeja do Windows:
 
-## ✨ Funcionalidades
+- **Busca filtrada** nas páginas públicas do LinkedIn: vagas **remotas no Brasil** e **presenciais/híbridas na sua cidade** (Bauru-SP por padrão), níveis 2 a 4 (`f_E=2,3,4`), publicadas nas últimas horas.
+- **Sem promovidas, sem ruído**: exige termos de desenvolvimento no título e descarta senioridade alta, gestão, QA, dados/BI, DevOps, stacks fora do foco, mobile nativo, low-code e cargos "developer" que não são de software. Tudo editável na tela de Configurações.
+- **Confere cada vaga**: abre a página da vaga para confirmar o modelo de trabalho, descartar promovidas e vagas acima do limite de candidatos, e guardar a descrição.
+- **Anti-spam e sem repetição**: no máximo N vagas da mesma empresa em 24 h; vaga já vista nunca volta.
+- **Nota de match com IA**: com o seu currículo (texto ou PDF) e uma chave do Gemini, cada vaga nova ganha nota de 0 a 100, pontos fortes, lacunas e um resumo de uma linha. Quanto maior a nota, mais o card brilha.
+- **Kanban de candidaturas**: Nova → Salva → Aplicada → Entrevista → Descartada, arrastando os cards, com anotações e a data de cada mudança.
+- **Varredura agendada**: a cada X minutos (padrão 60), com notificação do Windows quando aparece vaga com nota alta, e botão "Varrer agora" com progresso ao vivo.
 
-- **Duas buscas por palavra-chave** — vagas **remotas no Brasil** e vagas **presenciais/híbridas em Bauru-SP**, nos níveis de experiência 2 a 4 do LinkedIn (`f_E=2,3,4`) e dentro da janela de tempo configurada.
-- **Sem vagas promovidas** — descarta cards marcados como *Promoted/Promovida* e confirma abrindo a página de cada vaga.
-- **Filtro por regex** — exige termos de desenvolvimento no título e bloqueia senioridade alta, gestão, QA, dados/BI, DevOps/infra, stacks fora do foco (Java, PHP, Ruby, C++, Rust…), mobile nativo, plataformas específicas (SAP, Salesforce, OutSystems…) e cargos "developer" que não são de software.
-- **Limite de candidatos** — ignora vagas com mais candidatos que `MAX_APPLICANTS`.
-- **Anti-spam por empresa** — no máximo `MAX_VAGAS_POR_EMPRESA` vagas da mesma empresa por ciclo e nas últimas 24 h.
-- **Sem repetição** — IDs enviados ficam salvos em SQLite.
-- **Agendado** — roda ao iniciar e depois a cada hora (`node-cron`), ou uma única vez com `--once`.
-- **Pronto para VPS** — Dockerfile baseado na imagem oficial do Playwright + `docker-compose` com volume para o banco.
+## Telas
 
-## 📲 Mensagem no Telegram
+| Vagas | Detalhe da vaga (painel lateral) |
+|---|---|
+| ![Vagas](docs/media/vagas.png) | ![Detalhe](docs/media/vaga-detalhe.png) |
 
-```text
-🚀 Nova Vaga Encontrada!
+| Candidaturas | Varredura ao vivo |
+|---|---|
+| ![Kanban](docs/media/candidaturas.png) | ![Varredura](docs/media/varredura-ao-vivo.png) |
 
-Cargo: <título da vaga>
-Empresa: <empresa>
-📍 Local: <localização>
-💼 Modelo: Remoto | Híbrido | Presencial
+| Histórico de varreduras | Configurações |
+|---|---|
+| ![Histórico](docs/media/varredura.png) | ![Configurações](docs/media/configuracoes.png) |
 
-🔗 Link direto para a vaga
+> Prints de uma varredura real (2 palavras-chave, janela de 24 h), ainda sem chave do Gemini: por isso as vagas aparecem sem nota e sem brilho. Com currículo e chave salvos, cada card ganha o anel com a nota e brilha proporcionalmente a ela.
+
+## Como funciona uma varredura
+
+```
+palavras-chave × (remoto Brasil + cada cidade)
+        │  Chrome/Edge do sistema, invisível, páginas públicas
+        ▼
+  Buscando ──► cards da busca ─► sem promovidas ─► título no perfil ─► sem termos de exclusão ─► cidade/modelo
+        ▼
+  Filtrando ─► junta repetidas ─► tira as já vistas
+        ▼
+  Conferindo ─► página de cada vaga: modelo real, promovida, nº de candidatos, descrição
+        ▼                                   ─► anti-spam por empresa (24 h) ─► jobs.json (coluna "Nova")
+  Analisando com IA ─► Gemini compara vaga × currículo ─► nota, pontos fortes, lacunas, resumo
+        ▼
+  notificação do Windows para nota ≥ mínima
 ```
 
-## 🛠️ Tecnologias
+## Rodar e gerar o instalador
 
-- **Node.js + TypeScript**
-- **Playwright** (Chromium) — navegação nas páginas de busca
-- **Cheerio** — parsing do HTML
-- **SQLite** (`sqlite` + `sqlite3`) — histórico de vagas enviadas
-- **Axios** — Bot API do Telegram
-- **node-cron** — agendamento
-- **Docker / Docker Compose**
-
-## 🚀 Como rodar
+Precisa de Node 22+ e do Google Chrome ou Microsoft Edge instalado (o Edge já vem no Windows).
 
 ```bash
 git clone https://github.com/KevinLopes23/linkedin-job-bot.git
 cd linkedin-job-bot
-npm install          # também instala o Chromium do Playwright
-cp .env.example .env # preencha as variáveis abaixo
+npm install
+npm run dev        # abre o app em modo desenvolvimento
+npm run dist       # gera release/Vagalume-Setup-<versão>.exe
 ```
 
-| Variável | Descrição |
+Outros comandos: `npm test` (vitest), `npm run typecheck`, `npm run build`.
+
+### Primeiro uso
+
+1. **Configurações → Currículo**: cole o texto ou importe o PDF.
+2. **Configurações → Gemini**: cole a chave gratuita do [Google AI Studio](https://aistudio.google.com/apikey) e clique em *Testar*. Sem chave o app funciona normalmente, só não dá nota.
+3. **Varredura → Varrer agora**. Depois disso, ele varre sozinho no intervalo configurado. Fechar a janela só esconde o app na bandeja; para sair, use *Sair* no ícone da bandeja.
+
+Os dados ficam só no seu computador, em `%APPDATA%\vagalume` (`settings.json`, `jobs.json`, `scans.json`). A chave do Gemini é guardada cifrada pelo Windows (DPAPI) em `secrets.json`.
+
+## Estrutura
+
+| Pasta | O que tem |
 |---|---|
-| `TELEGRAM_TOKEN` | Token do bot (crie no [@BotFather](https://t.me/BotFather)) — obrigatória |
-| `TELEGRAM_CHAT_ID` | ID do chat que vai receber as vagas — obrigatória |
-| `SEARCH_KEYWORDS` | Termos de busca separados por vírgula |
-| `SEARCH_TIME_HOURS` | Janela de publicação das vagas, em horas |
-| `MAX_APPLICANTS` | Máximo de candidatos por vaga (`0` desativa) |
-| `MAX_VAGAS_POR_EMPRESA` | Limite de vagas por empresa (padrão 3) |
-| `DATABASE_PATH` | Caminho do banco SQLite |
-| `SCRAPER_DELAY_MS` | Pausa entre requisições, em ms |
+| `src/main/scan` | `filters.ts` (URLs e filtros do bot, puros), `parse.ts` (HTML da busca e da vaga), `linkedin.ts` (navegador), `scanService.ts` (etapas da varredura), `scheduler.ts` |
+| `src/main/ai` | Cliente do Gemini com saída JSON validada (zod) |
+| `src/main/data` | Validação (zod) e repositório de vagas/histórico |
+| `src/main/store` | `JsonFile`: leitura validada e escrita atômica |
+| `src/main/settings` | Configurações e chave cifrada |
+| `src/main/ipc` | Handlers IPC com validação de toda entrada |
+| `src/renderer` | React: Início, Vagas, Candidaturas, Varredura, Configurações |
+| `build/` | Logo SVG e ícones (`render-icon.mjs` regera os PNG/ICO) |
 
-```bash
-npm run dev:once     # executa um ciclo e encerra
-npm run dev          # executa agora e depois a cada hora
+## Aviso
 
-# produção
-npm run build && npm start
+O app lê as páginas públicas do LinkedIn, o que pode contrariar os Termos de Uso da plataforma. Use para fins pessoais, mantenha a pausa entre buscas e não sobrecarregue o site. Os seletores podem quebrar se o LinkedIn mudar o HTML.
 
-# Docker (VPS)
-docker compose up --build -d
-docker compose logs -f
-```
-
-Para mudar o que é filtrado, edite as listas `termosRelevantes` e `termosExclusao` em `src/scraper.ts`; as localidades das buscas ficam em `gerarUrls()` no mesmo arquivo.
-
-## ⚠️ Aviso
-
-O bot faz scraping das páginas públicas do LinkedIn, o que pode contrariar os Termos de Uso da plataforma. Use para fins pessoais, mantenha os intervalos entre requisições e não sobrecarregue o site. Os seletores podem quebrar se o LinkedIn mudar o HTML.
-
-## 👤 Autor
+## Autor
 
 Feito por [Kevin Lopes](https://github.com/KevinLopes23)
