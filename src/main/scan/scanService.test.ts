@@ -16,7 +16,9 @@ afterEach(() => {
 
 const settings: Settings = { ...DEFAULT_SETTINGS, keywords: ['Desenvolvedor'], cities: [], maxPerCompany: 1, autoScan: false, resumeText: 'React, Node' }
 
-function setup(opts: { scorer?: Scorer | null; browser?: Partial<ScanBrowser> } = {}) {
+function setup(
+  opts: { scorer?: Scorer | null; browser?: Partial<ScanBrowser>; sleep?: (ms: number) => Promise<void>; settings?: Partial<Settings> } = {}
+) {
   dir = mkdtempSync(join(tmpdir(), 'vagalume-scan-'))
   const jobs = new JobsRepo(new JsonFile<Job[]>(join(dir, 'jobs.json'), parseJobs, () => []))
   const history = new ScanHistoryRepo(new JsonFile<ScanRecord[]>(join(dir, 'scans.json'), parseScanHistory, () => []))
@@ -35,19 +37,20 @@ function setup(opts: { scorer?: Scorer | null; browser?: Partial<ScanBrowser> } 
   }
   const statuses: ScanStatus[] = []
   const newJobs = vi.fn()
+  const createBrowser = vi.fn(() => browser)
   const service = new ScanService({
-    createBrowser: () => browser,
+    createBrowser,
     jobs,
     history,
-    settings: () => settings,
+    settings: () => ({ ...settings, ...opts.settings }),
     createScorer: () => (opts.scorer === undefined ? null : opts.scorer),
     onStatus: (s) => statuses.push(s),
     onJobsChanged: () => undefined,
     onHistoryChanged: () => undefined,
     onNewJobs: newJobs,
-    sleep: async () => undefined
+    sleep: opts.sleep ?? (async () => undefined)
   })
-  return { service, jobs, history, statuses, newJobs }
+  return { service, jobs, history, statuses, newJobs, createBrowser }
 }
 
 describe('ScanService', () => {
@@ -115,5 +118,48 @@ describe('ScanService', () => {
     await service.whenIdle()
     expect(service.getStatus().message).toBe('Varredura interrompida.')
     expect(history.list()).toHaveLength(1)
+  })
+
+  it('todas as buscas falhando vira erro, não "Concluído: 0 vagas" (M1)', async () => {
+    const { service, history } = setup({
+      browser: {
+        searchHtml: async () => {
+          throw new Error('net::ERR_INTERNET_DISCONNECTED')
+        }
+      }
+    })
+    service.start()
+    await service.whenIdle()
+    expect(history.list()[0]?.error).toMatch(/Nenhuma busca respondeu \(1 de 1 falharam\).*ERR_INTERNET_DISCONNECTED/)
+    expect(service.getStatus().message).toMatch(/^Erro:/)
+  })
+
+  it('busca sem resultado (0 cards, sem erro) continua sendo "Concluído"', async () => {
+    const { service, history } = setup({ browser: { searchHtml: async () => searchPage([]) } })
+    service.start()
+    await service.whenIdle()
+    expect(history.list()[0]).toMatchObject({ cards: 0, error: null })
+  })
+
+  it('"Parar" interrompe a pausa entre buscas na hora', async () => {
+    const never = (): Promise<void> => new Promise(() => undefined)
+    const { service, history } = setup({ sleep: never, settings: { keywords: ['Dev', 'Node'] }, browser: { searchHtml: async () => searchPage([]) } })
+    service.start()
+    await vi.waitFor(() => expect(service.getStatus().log.length).toBeGreaterThan(0))
+    service.stop()
+    await service.whenIdle()
+    expect(service.getStatus().message).toBe('Varredura interrompida.')
+    expect(history.list()).toHaveLength(1)
+  })
+
+  it('start em dobro durante a varredura não abre outro navegador', async () => {
+    const { service, createBrowser, history } = setup()
+    service.start()
+    service.start()
+    await service.whenIdle()
+    service.start()
+    await service.whenIdle()
+    expect(createBrowser).toHaveBeenCalledTimes(2)
+    expect(history.list()).toHaveLength(2)
   })
 })

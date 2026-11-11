@@ -59,6 +59,8 @@ export class ScanService {
   private readonly scheduler: Scheduler
   private readonly sleep: (ms: number) => Promise<void>
   private running: Promise<void> = Promise.resolve()
+  /** Acorda a pausa em andamento quando o usuário pede para parar. */
+  private wake: (() => void) | null = null
 
   constructor(private readonly deps: ScanDeps) {
     this.sleep = deps.sleep ?? defaultSleep
@@ -87,6 +89,7 @@ export class ScanService {
   stop(): ScanStatus {
     if (this.status.running) {
       this.cancelRequested = true
+      this.wake?.()
       this.update({ message: 'Parando após a etapa atual...' })
     }
     return this.status
@@ -101,6 +104,7 @@ export class ScanService {
   dispose(): void {
     this.disposed = true
     this.cancelRequested = true
+    this.wake?.()
     this.scheduler.clear()
   }
 
@@ -140,6 +144,8 @@ export class ScanService {
     const urls = buildSearchUrls(settings)
     const patterns = { title: compileTerms(settings.titleTerms), exclude: compileTerms(settings.excludeTerms) }
     const all: Candidate[] = []
+    let failed = 0
+    let lastError = ''
     for (const [index, search] of urls.entries()) {
       this.checkCancel()
       const where = search.kind === 'remoto' ? 'remoto (Brasil)' : search.city
@@ -150,9 +156,15 @@ export class ScanService {
         all.push(...result.candidates)
         this.log('info', `"${search.keyword}" · ${where}: ${result.cards} card(s), ${result.candidates.length} no perfil.`)
       } catch (e) {
-        this.log('aviso', `"${search.keyword}" · ${where}: ${errorText(e)}`)
+        failed++
+        lastError = errorText(e)
+        this.log('aviso', `"${search.keyword}" · ${where}: ${lastError}`)
       }
-      if (index < urls.length - 1) await this.sleep(settings.delayMs)
+      if (index < urls.length - 1) await this.pause(settings.delayMs)
+    }
+    // Busca com erro e nenhum card lido: não é "sem vagas", é varredura que não funcionou.
+    if (failed > 0 && record.cards === 0) {
+      throw new Error(`Nenhuma busca respondeu (${failed} de ${urls.length} falharam). Último erro: ${lastError}`)
     }
     return all
   }
@@ -187,7 +199,7 @@ export class ScanService {
       } catch (e) {
         this.log('aviso', `Não deu para abrir "${candidate.title}": ${errorText(e)}. Ignorada por segurança.`)
       }
-      if (index < candidates.length - 1) await this.sleep(Math.round(settings.delayMs / 3))
+      if (index < candidates.length - 1) await this.pause(Math.round(settings.delayMs / 3))
     }
     return approved
   }
@@ -223,9 +235,17 @@ export class ScanService {
         this.log('aviso', `IA: ${message}`)
         if (isFatalGeminiError(message)) break
       }
-      if (index < queue.length - 1) await this.sleep(AI_CALL_GAP_MS)
+      if (index < queue.length - 1) await this.pause(AI_CALL_GAP_MS)
     }
     return analyzed
+  }
+
+  /** Pausa anti-rate-limit que termina na hora se o usuário pedir para parar. */
+  private async pause(ms: number): Promise<void> {
+    if (this.cancelRequested) throw new CancelledError('cancelado')
+    await Promise.race([this.sleep(ms), new Promise<void>((resolve) => (this.wake = resolve))])
+    this.wake = null
+    this.checkCancel()
   }
 
   private checkCancel(): void {
