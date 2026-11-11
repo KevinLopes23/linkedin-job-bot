@@ -61,6 +61,8 @@ export interface Settings {
 
 export interface SettingsView extends Settings {
   readonly hasGeminiKey: boolean
+  /** Há chave salva, mas o Windows não conseguiu decifrá-la (ex.: perfil do Windows trocado). */
+  readonly geminiKeyUnreadable: boolean
 }
 
 export type ScanStage = 'buscando' | 'filtrando' | 'conferindo' | 'analisando'

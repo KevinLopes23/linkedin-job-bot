@@ -149,10 +149,11 @@ export function SettingsPage({ initial, onSaved }: { initial: SettingsView; onSa
 
         <Card title="Gemini" lead="Chave gratuita no Google AI Studio. Sem chave, o app funciona e só não dá nota.">
           <div className="row">
-            <span className={`pill${view.hasGeminiKey ? ' pill--on' : ''}`}>
+            <span className={`pill${view.hasGeminiKey ? ' pill--on' : view.geminiKeyUnreadable ? ' pill--warn' : ''}`}>
               <Icon name={view.hasGeminiKey ? 'check' : 'key'} size={14} />
-              {view.hasGeminiKey ? 'Chave salva' : 'Sem chave'}
+              {view.hasGeminiKey ? 'Chave salva' : view.geminiKeyUnreadable ? 'Chave salva, mas o Windows não conseguiu abrir' : 'Sem chave'}
             </span>
+            {view.geminiKeyUnreadable && <span className="muted">Cole a chave e salve de novo.</span>}
           </div>
           <div className="row">
             <input

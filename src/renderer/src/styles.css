@@ -472,6 +472,10 @@ button {
   font-size: 13px;
   font-weight: 650;
 }
+.pill--warn {
+  background: rgba(255, 154, 115, 0.14);
+  color: var(--ember);
+}
 .pill--on {
   background: rgba(166, 227, 127, 0.14);
   color: var(--moss);

@@ -28,7 +28,8 @@ export class SettingsService {
   }
 
   view(): SettingsView {
-    return { ...this.get(), hasGeminiKey: this.getGeminiKey() !== null }
+    const key = this.getGeminiKey()
+    return { ...this.get(), hasGeminiKey: key !== null, geminiKeyUnreadable: key === null && Boolean(this.secrets.read().geminiKey) }
   }
 
   save(raw: unknown): SettingsView {
@@ -58,7 +59,8 @@ export class SettingsService {
     if (!stored) return null
     try {
       return safeStorage.decryptString(Buffer.from(stored, 'base64'))
-    } catch {
+    } catch (error) {
+      console.error('[settings] A chave do Gemini está salva mas não pôde ser decifrada:', error instanceof Error ? error.message : error)
       return null
     }
   }
