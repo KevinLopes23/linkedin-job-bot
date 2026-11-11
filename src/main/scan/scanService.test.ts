@@ -6,7 +6,8 @@ import type { Job, ScanRecord, ScanStatus, Settings } from '../../shared/types'
 import { JobsRepo, ScanHistoryRepo } from '../data/jobsRepo'
 import { DEFAULT_SETTINGS, parseJobs, parseScanHistory } from '../data/validation'
 import { JsonFile } from '../store/jsonFile'
-import { detailPage, searchPage } from './fixtures'
+import { authwallPage, detailPage, noResultsSearchPage, searchPage } from './fixtures'
+import { assertSearchStatus } from './linkedin'
 import { ScanService, type ScanBrowser, type Scorer } from './scanService'
 
 let dir = ''
@@ -134,16 +135,53 @@ describe('ScanService', () => {
     expect(service.getStatus().message).toMatch(/^Erro:/)
   })
 
-  it('busca sem resultado (0 cards, sem erro) continua sendo "Concluído"', async () => {
-    const { service, history } = setup({ browser: { searchHtml: async () => searchPage([]) } })
+  it('busca legítima sem resultado (aviso "Não encontramos resultados") continua sendo "Concluído"', async () => {
+    const { service, history } = setup({ browser: { searchHtml: async () => noResultsSearchPage } })
     service.start()
     await service.whenIdle()
     expect(history.list()[0]).toMatchObject({ cards: 0, error: null })
   })
 
+  it('LinkedIn pedindo login (authwall) em todas as buscas vira erro (M1)', async () => {
+    const { service, history } = setup({ settings: { keywords: ['Dev', 'Node'] }, browser: { searchHtml: async () => authwallPage } })
+    service.start()
+    await service.whenIdle()
+    expect(history.list()[0]?.error).toMatch(/Nenhuma busca respondeu \(2 de 2 falharam\).*pediu login/)
+  })
+
+  it('HTTP 429 do LinkedIn em todas as buscas vira erro (M1)', async () => {
+    const { service, history, statuses } = setup({
+      browser: {
+        searchHtml: async () => {
+          assertSearchStatus(429)
+          return ''
+        }
+      }
+    })
+    service.start()
+    await service.whenIdle()
+    expect(history.list()[0]?.error).toMatch(/HTTP 429 \(muitas buscas seguidas/)
+    expect(statuses.at(-1)?.message).toMatch(/^Erro:/)
+  })
+
+  it('uma busca bloqueada e outra com vagas: segue e só avisa no log', async () => {
+    let call = 0
+    const { service, history } = setup({
+      settings: { keywords: ['Dev', 'Node'] },
+      browser: {
+        searchHtml: async () =>
+          ++call === 1 ? authwallPage : searchPage([{ id: '4000000001', title: 'Desenvolvedor React', company: 'Acme', location: 'Brasil (Remoto)' }])
+      }
+    })
+    service.start()
+    await service.whenIdle()
+    expect(history.list()[0]).toMatchObject({ error: null, added: 1 })
+    expect(service.getStatus().log.some((l) => l.level === 'aviso' && /pediu login/.test(l.message))).toBe(true)
+  })
+
   it('"Parar" interrompe a pausa entre buscas na hora', async () => {
     const never = (): Promise<void> => new Promise(() => undefined)
-    const { service, history } = setup({ sleep: never, settings: { keywords: ['Dev', 'Node'] }, browser: { searchHtml: async () => searchPage([]) } })
+    const { service, history } = setup({ sleep: never, settings: { keywords: ['Dev', 'Node'] }, browser: { searchHtml: async () => noResultsSearchPage } })
     service.start()
     await vi.waitFor(() => expect(service.getStatus().log.length).toBeGreaterThan(0))
     service.stop()

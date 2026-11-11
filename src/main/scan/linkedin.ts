@@ -7,6 +7,13 @@ const CONTENT_TIMEOUT_MS = 10_000
 const SEARCH_READY = '.jobs-search__results-list li, .base-search-card, .jobs-search-no-results-banner, .no-results'
 const DETAIL_READY = '.show-more-less-html__markup, .description__text, .top-card-layout'
 
+/** Resposta HTTP de erro do LinkedIn (429 = muitas buscas seguidas) vira falha da busca, não "sem vagas". */
+export function assertSearchStatus(status: number | null): void {
+  if (status === null || status < 400) return
+  const hint = status === 429 ? ' (muitas buscas seguidas; aumente a pausa entre buscas)' : ''
+  throw new Error(`o LinkedIn respondeu HTTP ${status}${hint}`)
+}
+
 export function browserErrorMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error)
   if (/executable doesn't exist|is not found|not found at/i.test(raw)) {
@@ -50,7 +57,8 @@ export class LinkedInBrowser {
   /** HTML da página de busca, sem os itens promovidos (equivalente ao filtro uBlock do bot). */
   async searchHtml(url: string): Promise<string> {
     const page = this.requirePage()
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT_MS })
+    const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT_MS })
+    assertSearchStatus(response?.status() ?? null)
     await page.waitForSelector(SEARCH_READY, { timeout: CONTENT_TIMEOUT_MS }).catch(() => undefined)
     // Rola para acionar o lazy-load e espera a rede assentar (sem pausa fixa).
     await page.evaluate(() => window.scrollBy(0, 500))

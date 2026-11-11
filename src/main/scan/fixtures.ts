@@ -41,5 +41,11 @@ export const detailPage = (opts: { body?: string; description?: string; similar?
   ${opts.htmlExtra ?? ''}
 </body></html>`
 
-/** Página que o LinkedIn devolve quando pede login (sem a área da vaga). */
-export const authwallPage = '<html><head><title>Cadastre-se no LinkedIn</title></head><body><h1>Cadastre-se no LinkedIn</h1></body></html>'
+/** Busca legítima sem resultado (o LinkedIn mostra o aviso, sem cards). */
+export const noResultsSearchPage =
+  '<html><body><h1>Não encontramos resultados para Vagas de Desenvolvedor em: Bauru, São Paulo, Brasil</h1></body></html>'
+
+/** Página que o LinkedIn devolve quando pede login (authwall): sem lista, sem vaga, com o formulário de cadastro. */
+export const authwallPage =
+  '<html><head><title>Cadastre-se | LinkedIn</title></head><body><h1 class="authwall-join-form__title">Cadastre-se no LinkedIn</h1>' +
+  '<form class="join-form"><input name="email-or-phone" /></form></body></html>'

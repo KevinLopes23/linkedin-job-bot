@@ -3,7 +3,7 @@ import type { Job, LogLevel, Match, ScanRecord, ScanStage, ScanStatus, Settings 
 import { isFatalGeminiError } from '../ai/gemini'
 import type { JobsRepo, NewJob, ScanHistoryRepo } from '../data/jobsRepo'
 import { buildSearchUrls, compileTerms, limitPerCompany } from './filters'
-import { checkDetail, dedupeById, parseSearchHtml, type Candidate } from './parse'
+import { checkDetail, dedupeById, isBlockedSearchPage, parseSearchHtml, type Candidate } from './parse'
 import { Scheduler } from './scheduler'
 
 const MAX_LOG_ENTRIES = 300
@@ -151,7 +151,11 @@ export class ScanService {
       const where = search.kind === 'remoto' ? 'remoto (Brasil)' : search.city
       this.stage('buscando', `Buscando "${search.keyword}" · ${where}`, index, urls.length)
       try {
-        const result = parseSearchHtml(await browser.searchHtml(search.url), search, patterns)
+        const html = await browser.searchHtml(search.url)
+        const result = parseSearchHtml(html, search, patterns)
+        if (result.cards === 0 && isBlockedSearchPage(html)) {
+          throw new Error('o LinkedIn não mostrou a lista de vagas (pediu login ou limitou o acesso)')
+        }
         record.cards += result.cards
         all.push(...result.candidates)
         this.log('info', `"${search.keyword}" · ${where}: ${result.cards} card(s), ${result.candidates.length} no perfil.`)

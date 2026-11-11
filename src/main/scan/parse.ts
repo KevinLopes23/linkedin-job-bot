@@ -92,6 +92,19 @@ export function parseSearchHtml(html: string, search: Pick<SearchUrl, 'kind' | '
   return { cards: cards.length, candidates }
 }
 
+const NO_RESULTS_TEXT = /não encontramos (nenhuma vaga|resultados)|nenhuma vaga corresponde|no matching jobs|we couldn.t find/i
+
+/**
+ * Página de busca sem nenhum card e sem o aviso de "nenhum resultado": o LinkedIn pediu login
+ * (authwall) ou limitou o acesso. Conta como busca que falhou, não como "não havia vagas".
+ */
+export function isBlockedSearchPage(html: string): boolean {
+  const $ = cheerio.load(html)
+  if ($('.jobs-search__results-list li, .base-search-card, .job-search-card').length > 0) return false
+  if ($('.jobs-search-no-results-banner, .no-results').length > 0) return false
+  return !NO_RESULTS_TEXT.test($('h1, h2').text())
+}
+
 /** Junta as vagas repetidas entre buscas (a última leitura vence, como no bot). */
 export function dedupeById<T extends { id: string }>(items: readonly T[]): T[] {
   return [...new Map(items.map((i) => [i.id, i])).values()]

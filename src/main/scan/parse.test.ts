@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { compileTerms, DEFAULT_EXCLUDE_TERMS, DEFAULT_TITLE_TERMS } from './filters'
-import { authwallPage, detailPage, searchPage } from './fixtures'
-import { checkDetail, dedupeById, extractJobId, parseSearchHtml, type Candidate } from './parse'
+import { authwallPage, detailPage, noResultsSearchPage, searchPage } from './fixtures'
+import { checkDetail, dedupeById, extractJobId, isBlockedSearchPage, parseSearchHtml, type Candidate } from './parse'
 
 const patterns = { title: compileTerms(DEFAULT_TITLE_TERMS), exclude: compileTerms(DEFAULT_EXCLUDE_TERMS) }
 const remote = { kind: 'remoto' as const, city: null }
@@ -12,6 +12,15 @@ describe('extractJobId', () => {
   it('cai para /jobs/view/<id>', () => expect(extractJobId(undefined, 'https://x/jobs/view/4012345678/')).toBe('4012345678'))
   it('cai para o fim do slug', () => expect(extractJobId(undefined, 'https://x/jobs/view/dev-react-4012345679?x=1')).toBe('4012345679'))
   it('vazio sem pistas', () => expect(extractJobId(undefined, 'https://x/abc')).toBe(''))
+})
+
+describe('isBlockedSearchPage', () => {
+  it('authwall (login) sem lista = bloqueada', () => expect(isBlockedSearchPage(authwallPage)).toBe(true))
+  it('aviso de "nenhum resultado" = busca legítima vazia', () => expect(isBlockedSearchPage(noResultsSearchPage)).toBe(false))
+  it('banner de sem resultado também conta', () =>
+    expect(isBlockedSearchPage('<div class="jobs-search-no-results-banner">Nada</div>')).toBe(false))
+  it('com cards = não bloqueada', () =>
+    expect(isBlockedSearchPage(searchPage([{ id: '4000000001', title: 'Dev', company: 'A', location: 'Brasil' }]))).toBe(false))
 })
 
 describe('parseSearchHtml', () => {
