@@ -92,6 +92,9 @@ export function parseSearchHtml(html: string, search: Pick<SearchUrl, 'kind' | '
   return { cards: cards.length, candidates }
 }
 
+/** Texto que marca um item promovido da lista; o searchHtml tira esses <li> antes de devolver o HTML. */
+export const PROMOTED_ITEM_MARKERS: readonly string[] = ['Promoted', 'Promovida', 'Promovido']
+
 const NO_RESULTS_TEXT = /não encontramos (nenhuma vaga|resultados)|nenhuma vaga corresponde|no matching jobs|we couldn.t find/i
 
 /**
@@ -101,6 +104,8 @@ const NO_RESULTS_TEXT = /não encontramos (nenhuma vaga|resultados)|nenhuma vaga
 export function isBlockedSearchPage(html: string): boolean {
   const $ = cheerio.load(html)
   if ($('.jobs-search__results-list li, .base-search-card, .job-search-card').length > 0) return false
+  // A lista veio, só ficou vazia depois de tirar as promovidas: a busca funcionou.
+  if ($('.jobs-search__results-list').length > 0) return false
   if ($('.jobs-search-no-results-banner, .no-results').length > 0) return false
   return !NO_RESULTS_TEXT.test($('h1, h2').text())
 }

@@ -1,5 +1,6 @@
 /** Navegador da varredura: Chrome (ou Edge) do sistema, invisível, só páginas públicas do LinkedIn. */
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core'
+import { PROMOTED_ITEM_MARKERS } from './parse'
 
 const CHANNELS = ['chrome', 'msedge'] as const
 const NAV_TIMEOUT_MS = 30_000
@@ -63,12 +64,12 @@ export class LinkedInBrowser {
     // Rola para acionar o lazy-load e espera a rede assentar (sem pausa fixa).
     await page.evaluate(() => window.scrollBy(0, 500))
     await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => undefined)
-    await page.evaluate(() => {
+    await page.evaluate((markers) => {
       document.querySelectorAll('li').forEach((li) => {
         const text = li.textContent ?? ''
-        if (text.includes('Promoted') || text.includes('Promovida') || text.includes('Promovido')) li.remove()
+        if (markers.some((m) => text.includes(m))) li.remove()
       })
-    })
+    }, [...PROMOTED_ITEM_MARKERS])
     return page.content()
   }
 

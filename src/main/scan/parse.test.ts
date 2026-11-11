@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { compileTerms, DEFAULT_EXCLUDE_TERMS, DEFAULT_TITLE_TERMS } from './filters'
-import { authwallPage, detailPage, noResultsSearchPage, searchPage } from './fixtures'
-import { checkDetail, dedupeById, extractJobId, isBlockedSearchPage, parseSearchHtml, type Candidate } from './parse'
+import { authwallPage, cutPromotedItems, detailPage, noResultsSearchPage, searchPage } from './fixtures'
+import { checkDetail, dedupeById, extractJobId, isBlockedSearchPage, parseSearchHtml, PROMOTED_ITEM_MARKERS, type Candidate } from './parse'
 
 const patterns = { title: compileTerms(DEFAULT_TITLE_TERMS), exclude: compileTerms(DEFAULT_EXCLUDE_TERMS) }
 const remote = { kind: 'remoto' as const, city: null }
@@ -19,6 +19,16 @@ describe('isBlockedSearchPage', () => {
   it('aviso de "nenhum resultado" = busca legítima vazia', () => expect(isBlockedSearchPage(noResultsSearchPage)).toBe(false))
   it('banner de sem resultado também conta', () =>
     expect(isBlockedSearchPage('<div class="jobs-search-no-results-banner">Nada</div>')).toBe(false))
+  it('lista que só tinha promovidas, vazia depois do corte do searchHtml, não é bloqueio (R2-2)', () => {
+    const promoted = searchPage([
+      { id: '4000000001', title: 'Desenvolvedor React', company: 'A', location: 'Bauru, SP', extra: '<span>Promovida</span>' },
+      { id: '4000000002', title: 'Desenvolvedor Node', company: 'B', location: 'Bauru, SP', extra: '<span>Promoted</span>' }
+    ])
+    const afterCut = cutPromotedItems(promoted, PROMOTED_ITEM_MARKERS)
+    expect(parseSearchHtml(afterCut, bauru, patterns).cards).toBe(0)
+    expect(isBlockedSearchPage(afterCut)).toBe(false)
+  })
+
   it('com cards = não bloqueada', () =>
     expect(isBlockedSearchPage(searchPage([{ id: '4000000001', title: 'Dev', company: 'A', location: 'Brasil' }]))).toBe(false))
 })

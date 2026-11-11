@@ -1,3 +1,4 @@
+import * as cheerio from 'cheerio'
 /** HTML mínimo no formato das páginas públicas do LinkedIn (usado nos testes). */
 
 export interface CardFixture {
@@ -23,6 +24,16 @@ export const card = (c: CardFixture): string => `
     </div>
   </div>
 </li>`
+
+/** O mesmo corte que o searchHtml faz no navegador: tira todo <li> com marca de promovida. */
+export function cutPromotedItems(html: string, markers: readonly string[]): string {
+  const $ = cheerio.load(html)
+  $('li').each((_, li) => {
+    const text = $(li).text()
+    if (markers.some((m) => text.includes(m))) $(li).remove()
+  })
+  return $.html()
+}
 
 export const searchPage = (cards: readonly CardFixture[]): string =>
   `<html><body><ul class="jobs-search__results-list">${cards.map(card).join('')}</ul></body></html>`
