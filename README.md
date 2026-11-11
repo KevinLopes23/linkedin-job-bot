@@ -1,87 +1,96 @@
-# 🚀 LinkedIn Job Bot - Telegram Notifier
+<div align="center">
 
-Um bot inteligente escrito em **TypeScript** e **Node.js** que faz web scraping no LinkedIn em busca das melhores vagas de programação, filtra vagas lixo (promovidas, low-code, stacks não desejadas) e envia notificações diretamente para o seu celular via **Telegram**.
+# 🔎 LinkedIn Job Bot
+
+**Bot que vasculha o LinkedIn a cada hora, filtra vagas promovidas e fora do perfil, e manda só as boas para o seu Telegram.**
+
+![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Playwright](https://img.shields.io/badge/Playwright-2EAD33?style=for-the-badge&logo=playwright&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
+![Telegram](https://img.shields.io/badge/Telegram-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+
+</div>
+
+---
+
+## 💡 Sobre
+
+Procurar vaga no LinkedIn é rolar dezenas de anúncios promovidos, cargos sênior, stacks que você não usa e vagas com centenas de candidatos. Este bot faz a busca por você: abre as páginas de busca públicas com Playwright, aplica uma bateria de filtros, confere cada vaga individualmente e envia para o Telegram apenas as que passaram — sem repetir nenhuma.
 
 ## ✨ Funcionalidades
 
-- **Scraping Orgânico:** Usa o Playwright para buscar as vagas como um humano, acessando as URLs de busca sem precisar de APIs pagas do LinkedIn.
-- **Filtro de Vagas Promovidas:** Ignora automaticamente anúncios pagos (`Promoted` / `Recrutando ativamente`), garantindo que você veja apenas vagas orgânicas e reais.
-- **Múltiplos Termos:** Busca paralelamente por múltiplos cargos (ex: `Desenvolvedor`, `Analista de Sistemas`).
-- **Bloqueio de Stacks/Senioridade:** Filtro rigoroso com Regex para barrar vagas que contenham requisitos de linguagens não desejadas (como Java, PHP, Ruby, etc.), cargos C-Level/Seniores, ou níveis muito iniciais (Estágio).
-- **Banco de Dados Anti-Spam:** Utiliza **SQLite** local para salvar as vagas já enviadas. Você nunca receberá a mesma vaga duas vezes.
-- **Filtro Estrito de Modelo:** Para buscas nacionais, ele garante que apenas vagas **100% Remotas** sejam enviadas.
-- **Docker Ready:** Preparado para rodar na nuvem 24/7 de forma extremamente leve e autônoma.
+- **Duas buscas por palavra-chave** — vagas **remotas no Brasil** e vagas **presenciais/híbridas em Bauru-SP**, nos níveis de experiência 2 a 4 do LinkedIn (`f_E=2,3,4`) e dentro da janela de tempo configurada.
+- **Sem vagas promovidas** — descarta cards marcados como *Promoted/Promovida* e confirma abrindo a página de cada vaga.
+- **Filtro por regex** — exige termos de desenvolvimento no título e bloqueia senioridade alta, gestão, QA, dados/BI, DevOps/infra, stacks fora do foco (Java, PHP, Ruby, C++, Rust…), mobile nativo, plataformas específicas (SAP, Salesforce, OutSystems…) e cargos "developer" que não são de software.
+- **Limite de candidatos** — ignora vagas com mais candidatos que `MAX_APPLICANTS`.
+- **Anti-spam por empresa** — no máximo `MAX_VAGAS_POR_EMPRESA` vagas da mesma empresa por ciclo e nas últimas 24 h.
+- **Sem repetição** — IDs enviados ficam salvos em SQLite.
+- **Agendado** — roda ao iniciar e depois a cada hora (`node-cron`), ou uma única vez com `--once`.
+- **Pronto para VPS** — Dockerfile baseado na imagem oficial do Playwright + `docker-compose` com volume para o banco.
 
-## 🛠️ Tecnologias Utilizadas
+## 📲 Mensagem no Telegram
 
-- **[TypeScript](https://www.typescriptlang.org/) / Node.js:** Lógica do sistema.
-- **[Playwright](https://playwright.dev/):** Automação do navegador Chrome/Chromium para extrair o HTML.
-- **[Cheerio](https://cheerio.js.org/):** Para parseamento rápido de HTML.
-- **[node-telegram-bot-api](https://github.com/yagop/node-telegram-bot-api):** Integração para o envio das mensagens.
-- **[better-sqlite3](https://github.com/WiseLibs/better-sqlite3):** Banco de dados relacional super rápido (em disco) para registro de vagas.
-- **[node-cron](https://github.com/node-cron/node-cron):** Agendador de tarefas para rodar o bot de hora em hora.
+```text
+🚀 Nova Vaga Encontrada!
 
----
+Cargo: <título da vaga>
+Empresa: <empresa>
+📍 Local: <localização>
+💼 Modelo: Remoto | Híbrido | Presencial
 
-## ⚙️ Como Configurar e Rodar Localmente
+🔗 Link direto para a vaga
+```
 
-### 1. Clonar e Instalar
+## 🛠️ Tecnologias
+
+- **Node.js + TypeScript**
+- **Playwright** (Chromium) — navegação nas páginas de busca
+- **Cheerio** — parsing do HTML
+- **SQLite** (`sqlite` + `sqlite3`) — histórico de vagas enviadas
+- **Axios** — Bot API do Telegram
+- **node-cron** — agendamento
+- **Docker / Docker Compose**
+
+## 🚀 Como rodar
+
 ```bash
-git clone https://github.com/seu-usuario/linkedin-job-bot.git
+git clone https://github.com/KevinLopes23/linkedin-job-bot.git
 cd linkedin-job-bot
-npm install
+npm install          # também instala o Chromium do Playwright
+cp .env.example .env # preencha as variáveis abaixo
 ```
 
-### 2. Configurar as Variáveis de Ambiente
-Renomeie o arquivo de exemplo:
+| Variável | Descrição |
+|---|---|
+| `TELEGRAM_TOKEN` | Token do bot (crie no [@BotFather](https://t.me/BotFather)) — obrigatória |
+| `TELEGRAM_CHAT_ID` | ID do chat que vai receber as vagas — obrigatória |
+| `SEARCH_KEYWORDS` | Termos de busca separados por vírgula |
+| `SEARCH_TIME_HOURS` | Janela de publicação das vagas, em horas |
+| `MAX_APPLICANTS` | Máximo de candidatos por vaga (`0` desativa) |
+| `MAX_VAGAS_POR_EMPRESA` | Limite de vagas por empresa (padrão 3) |
+| `DATABASE_PATH` | Caminho do banco SQLite |
+| `SCRAPER_DELAY_MS` | Pausa entre requisições, em ms |
+
 ```bash
-cp .env.example .env
-```
-Abra o arquivo `.env` e preencha as variáveis:
-- `TELEGRAM_TOKEN`: O Token do seu bot criado no [BotFather](https://t.me/BotFather) do Telegram.
-- `TELEGRAM_CHAT_ID`: O seu ID pessoal do Telegram (você pode descobrir o seu mandando `/getid` para o @userinfobot).
-- `SEARCH_KEYWORDS`: Os termos que você quer pesquisar separados por vírgula (Ex: `Desenvolvedor,Analista de Sistemas,Software Engineer`).
+npm run dev:once     # executa um ciclo e encerra
+npm run dev          # executa agora e depois a cada hora
 
-### 3. Rodar o Bot (Teste Único)
-Para testar se tudo está funcionando e enviar as primeiras vagas para o seu Telegram:
-```bash
-# Compilar o TypeScript
-npm run build
+# produção
+npm run build && npm start
 
-# Rodar o bot uma única vez
-npm run dev:once
+# Docker (VPS)
+docker compose up --build -d
+docker compose logs -f
 ```
 
-### 4. Rodar Continuamente (Em Background)
-Para deixar rodando a cada 1 hora no seu terminal local:
-```bash
-npm run dev
-```
+Para mudar o que é filtrado, edite as listas `termosRelevantes` e `termosExclusao` em `src/scraper.ts`; as localidades das buscas ficam em `gerarUrls()` no mesmo arquivo.
 
----
+## ⚠️ Aviso
 
-## 🐳 Como Hospedar com Docker (Recomendado para VPS)
+O bot faz scraping das páginas públicas do LinkedIn, o que pode contrariar os Termos de Uso da plataforma. Use para fins pessoais, mantenha os intervalos entre requisições e não sobrecarregue o site. Os seletores podem quebrar se o LinkedIn mudar o HTML.
 
-Se você tem um Servidor Virtual Privado (VPS) na **Oracle Cloud, Hetzner, DigitalOcean ou AWS**, pode rodar o bot de forma invisível via Docker. O banco de dados (`jobs.db`) ficará salvo localmente dentro da pasta `data/` usando volumes.
+## 👤 Autor
 
-1. Preencha o seu `.env`.
-2. Rode o comando do Docker Compose:
-```bash
-docker-compose up --build -d
-```
-O bot vai instalar todas as dependências do Playwright, ligar e ficar rodando para sempre. Para ver os logs, digite: `docker-compose logs -f`.
-
----
-
-## 📝 Customizando a Lista de Exclusão (Filtros)
-
-Para ajustar quais vagas você **NÃO** quer receber (stacks que não trabalha, empresas específicas, etc), edite a variável `termosExclusao` no arquivo `src/scraper.ts`.
-
-Por padrão o bot já bloqueia:
-- **Linguagens Específicas:** Java, PHP, Ruby, Go, C++, Rust, Delphi.
-- **Low Code / E-commerce:** Power Platform, WordPress, Magento, Shopify, VTEX.
-- **Mobile Nativo:** iOS, Android, Flutter, Swift, Kotlin.
-- **Senioridades:** Sênior, Especialista, Tech Lead, Arquiteto, Estágio, Trainee.
-
----
-Feito com ☕ e IA para facilitar a vida do Desenvolvedor!
+Feito por [Kevin Lopes](https://github.com/KevinLopes23)
