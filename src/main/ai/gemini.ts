@@ -106,7 +106,7 @@ export class GeminiClient {
       })
       return parseMatchResponse(response.text ?? '')
     } catch (error) {
-      throw new Error(describeGeminiError(error))
+      throw new Error(describeGeminiError(error), { cause: error })
     }
   }
 
@@ -114,7 +114,7 @@ export class GeminiClient {
     try {
       await this.ai.models.generateContent({ model: this.model, contents: 'Responda apenas: ok' })
     } catch (error) {
-      throw new Error(describeGeminiError(error))
+      throw new Error(describeGeminiError(error), { cause: error })
     }
   }
 }

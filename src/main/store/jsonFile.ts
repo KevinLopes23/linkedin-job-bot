@@ -50,7 +50,7 @@ export class JsonFile<T> {
     } catch (error) {
       if (isMissingFile(error)) return this.fallback()
       const reason = error instanceof Error ? error.message : String(error)
-      throw new Error(`Não foi possível ler ${basename(this.path)} (${reason}). Tente de novo em instantes.`)
+      throw new Error(`Não foi possível ler ${basename(this.path)} (${reason}). Tente de novo em instantes.`, { cause: error })
     }
     try {
       return this.parse(JSON.parse(text))

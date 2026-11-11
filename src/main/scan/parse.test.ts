@@ -80,7 +80,7 @@ const candidate = (over: Partial<Candidate> = {}): Candidate => ({
 describe('checkDetail', () => {
   it('aprova e extrai descrição e candidatos', () => {
     const v = checkDetail(
-      detailPage({ body: 'Remoto · 37 candidaturas', description: '<p>Stack:   React</p><ul><li>Node</li><li>SQL</li></ul>' }),
+      detailPage({ body: 'Remoto · 37 candidaturas', description: '<p>Stack:&nbsp;&nbsp; React</p><ul><li>Node</li><li>SQL</li></ul>' }),
       candidate(),
       50
     )

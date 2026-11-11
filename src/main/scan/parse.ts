@@ -110,7 +110,7 @@ function descriptionText($: cheerio.CheerioAPI): string {
   node.find('br, p, li').after('\n')
   return node
     .text()
-    .replace(/[ \t ]+/g, ' ')
+    .replace(/[ \t\u00a0]+/g, ' ')
     .replace(/ *\n\s*/g, '\n')
     .trim()
     .slice(0, MAX_DESCRIPTION_CHARS)
