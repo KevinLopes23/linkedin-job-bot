@@ -1,3 +1,4 @@
+import { ApiError } from '@google/genai'
 import { describe, expect, it } from 'vitest'
 import { buildJobPrompt, describeGeminiError, isFatalGeminiError, parseMatchResponse } from './gemini'
 
@@ -32,11 +33,33 @@ describe('buildJobPrompt', () => {
 })
 
 describe('erros do Gemini', () => {
-  it('traduz chave, limite e modelo e marca como fatais', () => {
+  const api = (status: number, message: string): ApiError => new ApiError({ status, message })
+
+  it('classifica pelo status HTTP do ApiError', () => {
+    expect(describeGeminiError(api(400, 'API key not valid. Please pass a valid API key. API_KEY_INVALID'))).toMatch(/Chave/)
+    expect(describeGeminiError(api(400, 'Request contains an invalid argument.'))).toMatch(/Falha no Gemini \(HTTP 400\)/)
+    expect(describeGeminiError(api(403, 'forbidden'))).toMatch(/Chave/)
+    expect(describeGeminiError(api(401, 'unauthenticated'))).toMatch(/Chave/)
+    expect(describeGeminiError(api(429, 'RESOURCE_EXHAUSTED'))).toMatch(/Limite/)
+    expect(describeGeminiError(api(404, 'models/x is not found'))).toMatch(/Modelo/)
+  })
+
+  it('500 passageiro com "generate" no texto não vira Limite nem para a IA', () => {
+    const msg = describeGeminiError(api(500, 'got status: 500 Internal Server Error. Failed to generate content'))
+    expect(msg).toMatch(/HTTP 500/)
+    expect(isFatalGeminiError(msg)).toBe(false)
+  })
+
+  it('sem status, olha palavras inteiras (sem casar "generate", "separate" ou "4030 tokens")', () => {
     expect(describeGeminiError(new Error('API_KEY_INVALID'))).toMatch(/Chave/)
-    expect(describeGeminiError(new Error('429 RESOURCE_EXHAUSTED'))).toMatch(/Limite/)
-    expect(describeGeminiError(new Error('404 model not found'))).toMatch(/Modelo/)
-    expect(isFatalGeminiError(describeGeminiError(new Error('429')))).toBe(true)
-    expect(isFatalGeminiError(describeGeminiError(new Error('ECONNRESET')))).toBe(false)
+    expect(describeGeminiError(new Error('RESOURCE_EXHAUSTED: quota exceeded'))).toMatch(/Limite/)
+    expect(describeGeminiError(new Error('NOT_FOUND'))).toMatch(/Modelo/)
+    for (const raw of ['Failed to generate content', 'separate request', 'prompt has 4030 tokens', 'ECONNRESET']) {
+      expect(isFatalGeminiError(describeGeminiError(new Error(raw)))).toBe(false)
+    }
+  })
+
+  it('resposta fora do formato é dita como tal', () => {
+    expect(describeGeminiError(new SyntaxError('Unexpected token'))).toMatch(/formato inesperado/)
   })
 })

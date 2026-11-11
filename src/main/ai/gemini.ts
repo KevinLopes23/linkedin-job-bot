@@ -44,12 +44,31 @@ export function parseMatchResponse(text: string, at = new Date().toISOString()):
   }
 }
 
+const KEY_ERROR = 'Chave do Gemini inválida ou sem permissão.'
+const LIMIT_ERROR = 'Limite do Gemini atingido. Tente mais tarde ou reduza as análises por varredura.'
+const MODEL_ERROR = 'Modelo do Gemini não encontrado. Confira o nome do modelo em Configurações.'
+
+/** Status HTTP do ApiError do @google/genai, quando houver. */
+const httpStatus = (error: unknown): number | null => {
+  const status = (error as { status?: unknown } | null)?.status
+  return typeof status === 'number' ? status : null
+}
+
+/** Traduz o erro pelo status HTTP; o texto só é olhado quando não há status (com palavras inteiras). */
 export function describeGeminiError(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error)
-  if (/api key|API_KEY_INVALID|401|403|permission/i.test(raw)) return 'Chave do Gemini inválida ou sem permissão.'
-  if (/429|quota|rate|exhausted/i.test(raw)) return 'Limite do Gemini atingido. Tente mais tarde ou reduza as análises por varredura.'
-  if (/404|not found/i.test(raw)) return 'Modelo do Gemini não encontrado. Confira o nome do modelo em Configurações.'
-  if (raw.includes('ZodError') || error instanceof z.ZodError || error instanceof SyntaxError) return 'O Gemini respondeu num formato inesperado.'
+  if (error instanceof z.ZodError || error instanceof SyntaxError) return 'O Gemini respondeu num formato inesperado.'
+  const status = httpStatus(error)
+  if (status !== null) {
+    // Chave inválida chega como 400 INVALID_ARGUMENT com o motivo API_KEY_INVALID.
+    if (status === 401 || status === 403 || (status === 400 && /API_KEY_INVALID|\bapi key not valid\b/i.test(raw))) return KEY_ERROR
+    if (status === 429) return LIMIT_ERROR
+    if (status === 404) return MODEL_ERROR
+    return `Falha no Gemini (HTTP ${status}): ${raw.slice(0, 200)}`
+  }
+  if (/API_KEY_INVALID|PERMISSION_DENIED|\bapi key\b/i.test(raw)) return KEY_ERROR
+  if (/RESOURCE_EXHAUSTED|\bquota\b|\brate[ -]limit/i.test(raw)) return LIMIT_ERROR
+  if (/\bNOT_FOUND\b|\bmodels?\/\S+ is not found/i.test(raw)) return MODEL_ERROR
   return `Falha no Gemini: ${raw.slice(0, 200)}`
 }
 
