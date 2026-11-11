@@ -1,0 +1,29 @@
+appId: br.kevma.vagalume
+productName: Vagalume
+copyright: Copyright © 2026 Kevin Lopes
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**
+  - resources/**
+  - package.json
+# O Playwright lê arquivos próprios em tempo de execução; fora do .asar é mais seguro.
+asarUnpack:
+  - node_modules/playwright-core/**
+  - resources/**
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+  artifactName: Vagalume-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Vagalume
+  uninstallDisplayName: Vagalume
+  deleteAppDataOnUninstall: false
