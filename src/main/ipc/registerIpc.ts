@@ -1,6 +1,6 @@
 /** Registro dos handlers IPC. Toda entrada vinda do renderer é validada aqui. */
 import { readFile } from 'node:fs/promises'
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import { IPC } from '../../shared/ipc'
 import type { GeminiTestResult, Job } from '../../shared/types'
 import { GeminiClient } from '../ai/gemini'
@@ -16,6 +16,17 @@ export interface IpcDeps {
   readonly history: ScanHistoryRepo
   readonly scan: ScanService
   readonly onJobsChanged: (jobs: readonly Job[]) => void
+}
+
+/**
+ * Só a página do próprio app chama o IPC: o index.html empacotado (file://) ou o dev server.
+ * Defesa em profundidade caso um dia entre iframe/webview na janela.
+ */
+export function isTrustedSender(url: string | undefined, devOrigin: string | null): boolean {
+  if (!url || !URL.canParse(url)) return false
+  const parsed = new URL(url)
+  if (parsed.protocol === 'file:') return parsed.pathname.endsWith('/renderer/index.html')
+  return devOrigin !== null && parsed.origin === devOrigin
 }
 
 /** Só abre links https do LinkedIn. */
@@ -58,28 +69,36 @@ async function analyzeOne({ settings, jobs }: IpcDeps, id: string): Promise<read
 
 export function registerIpc(deps: IpcDeps): void {
   const { settings, jobs, history, scan, onJobsChanged } = deps
+  const devUrl = !app.isPackaged ? process.env['ELECTRON_RENDERER_URL'] : undefined
+  const devOrigin = devUrl && URL.canParse(devUrl) ? new URL(devUrl).origin : null
+  const handle = (channel: string, listener: (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown): void => {
+    ipcMain.handle(channel, (event, ...args) => {
+      if (!isTrustedSender(event.senderFrame?.url, devOrigin)) throw new Error('Chamada de origem não autorizada.')
+      return listener(event, ...args)
+    })
+  }
   const changed = (list: readonly Job[]): readonly Job[] => {
     onJobsChanged(list)
     return list
   }
 
-  ipcMain.handle(IPC.settingsGet, () => settings.view())
-  ipcMain.handle(IPC.settingsSave, (_e, raw: unknown) => settings.save(raw))
-  ipcMain.handle(IPC.settingsSetGeminiKey, (_e, key: unknown) => settings.setGeminiKey(key))
-  ipcMain.handle(IPC.settingsClearGeminiKey, () => settings.clearGeminiKey())
-  ipcMain.handle(IPC.settingsTestGemini, () => testGemini(settings))
-  ipcMain.handle(IPC.settingsImportResume, () => importResumePdf())
+  handle(IPC.settingsGet, () => settings.view())
+  handle(IPC.settingsSave, (_e, raw: unknown) => settings.save(raw))
+  handle(IPC.settingsSetGeminiKey, (_e, key: unknown) => settings.setGeminiKey(key))
+  handle(IPC.settingsClearGeminiKey, () => settings.clearGeminiKey())
+  handle(IPC.settingsTestGemini, () => testGemini(settings))
+  handle(IPC.settingsImportResume, () => importResumePdf())
 
-  ipcMain.handle(IPC.jobsList, () => jobs.list())
-  ipcMain.handle(IPC.jobsMove, (_e, id: unknown, status: unknown) => changed(jobs.move(parseJobId(id), parseStatus(status))))
-  ipcMain.handle(IPC.jobsSetNotes, (_e, id: unknown, notes: unknown) => changed(jobs.setNotes(parseJobId(id), parseNotes(notes))))
-  ipcMain.handle(IPC.jobsAnalyze, async (_e, id: unknown) => changed(await analyzeOne(deps, parseJobId(id))))
+  handle(IPC.jobsList, () => jobs.list())
+  handle(IPC.jobsMove, (_e, id: unknown, status: unknown) => changed(jobs.move(parseJobId(id), parseStatus(status))))
+  handle(IPC.jobsSetNotes, (_e, id: unknown, notes: unknown) => changed(jobs.setNotes(parseJobId(id), parseNotes(notes))))
+  handle(IPC.jobsAnalyze, async (_e, id: unknown) => changed(await analyzeOne(deps, parseJobId(id))))
 
-  ipcMain.handle(IPC.scanStatus, () => scan.getStatus())
-  ipcMain.handle(IPC.scanHistory, () => history.list())
-  ipcMain.handle(IPC.scanStart, () => scan.start())
-  ipcMain.handle(IPC.scanStop, () => scan.stop())
+  handle(IPC.scanStatus, () => scan.getStatus())
+  handle(IPC.scanHistory, () => history.list())
+  handle(IPC.scanStart, () => scan.start())
+  handle(IPC.scanStop, () => scan.stop())
 
-  ipcMain.handle(IPC.appVersion, () => app.getVersion())
-  ipcMain.handle(IPC.appOpenExternal, (_e, url: unknown) => shell.openExternal(requireLinkedInUrl(url)))
+  handle(IPC.appVersion, () => app.getVersion())
+  handle(IPC.appOpenExternal, (_e, url: unknown) => shell.openExternal(requireLinkedInUrl(url)))
 }

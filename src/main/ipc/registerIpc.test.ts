@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { requireLinkedInUrl } from './registerIpc'
+import { isTrustedSender, requireLinkedInUrl } from './registerIpc'
 
 describe('requireLinkedInUrl', () => {
   it('aceita só https do LinkedIn', () => {
@@ -11,4 +11,20 @@ describe('requireLinkedInUrl', () => {
     'recusa %s',
     (url) => expect(() => requireLinkedInUrl(url)).toThrow()
   )
+})
+
+describe('isTrustedSender', () => {
+  it('aceita a página do app (empacotada ou dev server)', () => {
+    expect(isTrustedSender('file:///C:/Program%20Files/Vagalume/resources/app.asar/out/renderer/index.html', null)).toBe(true)
+    expect(isTrustedSender('http://localhost:5173/', 'http://localhost:5173')).toBe(true)
+  })
+
+  it.each([
+    ['file:///C:/Users/x/Downloads/pagina.html', null],
+    ['http://localhost:5173/', null],
+    ['http://localhost:9999/', 'http://localhost:5173'],
+    ['https://www.linkedin.com/jobs/view/1', 'http://localhost:5173'],
+    [undefined, null],
+    ['não é url', null]
+  ])('recusa %s', (url, dev) => expect(isTrustedSender(url, dev)).toBe(false))
 })
