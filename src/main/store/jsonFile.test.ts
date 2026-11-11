@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { JsonFile } from './jsonFile'
+import { JsonFile, renameWithRetry } from './jsonFile'
 
 const parseNumbers = (raw: unknown): number[] =>
   Array.isArray(raw) ? raw.filter((v): v is number => typeof v === 'number') : []
@@ -56,5 +56,42 @@ describe('JsonFile', () => {
     file.write([1])
     expect(file.update((current) => [...current, 2])).toEqual([1, 2])
     expect(file.read()).toEqual([1, 2])
+  })
+})
+
+describe('renameWithRetry', () => {
+  const busy = (code: string): Error => Object.assign(new Error(`${code}: operation not permitted, rename`), { code })
+
+  it('tenta de novo em EPERM/EBUSY/EACCES e conclui', () => {
+    const errors = [busy('EPERM'), busy('EBUSY'), busy('EACCES')]
+    const calls: string[] = []
+    const waits: number[] = []
+    renameWithRetry('a.tmp', 'a', (from, to) => {
+      calls.push(`${from}>${to}`)
+      const e = errors.shift()
+      if (e) throw e
+    }, (ms) => waits.push(ms))
+    expect(calls).toHaveLength(4)
+    expect(waits).toEqual([40, 80, 120])
+  })
+
+  it('desiste depois de 5 tentativas e propaga o erro', () => {
+    let calls = 0
+    const rename = (): void => {
+      calls++
+      throw busy('EBUSY')
+    }
+    expect(() => renameWithRetry('a.tmp', 'a', rename, () => undefined)).toThrow(/EBUSY/)
+    expect(calls).toBe(5)
+  })
+
+  it('erro que não é de arquivo ocupado falha na hora', () => {
+    let calls = 0
+    const rename = (): void => {
+      calls++
+      throw busy('ENOSPC')
+    }
+    expect(() => renameWithRetry('a.tmp', 'a', rename, () => undefined)).toThrow(/ENOSPC/)
+    expect(calls).toBe(1)
   })
 })
