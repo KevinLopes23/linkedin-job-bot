@@ -74,7 +74,7 @@ npm run dev        # abre o app em modo desenvolvimento
 npm run dist       # gera release/Vagalume-Setup-<versão>.exe
 ```
 
-Outros comandos: `npm test` (vitest), `npm run typecheck`, `npm run build`.
+Outros comandos: `npm test` (vitest), `npm run typecheck`, `npm run lint` (ESLint) e `npm run build`. As ferramentas de lint ficam em `tools/lint`, com TypeScript 6 próprio (o `typescript-eslint` ainda não roda com o TypeScript 7 do app); o `npm install` da raiz já as instala.
 
 ### Primeiro uso
 
