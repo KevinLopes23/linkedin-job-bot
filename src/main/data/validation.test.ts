@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_SETTINGS, parseJobId, parseJobs, parseNotes, parseSettings, parseStatus, parseStoredSettings } from './validation'
+import { DEFAULT_SETTINGS, hasNestedQuantifier, parseJobId, parseJobs, parseNotes, parseSettings, parseStatus, parseStoredSettings } from './validation'
 
 describe('settings', () => {
   it('padrão = valores do bot antigo', () => {
@@ -20,6 +20,14 @@ describe('settings', () => {
   it('limpa listas: trim, sem vazios, sem repetidos', () => {
     const s = parseSettings({ ...DEFAULT_SETTINGS, keywords: [' Dev ', '', 'Dev', 'Node'] })
     expect(s.keywords).toEqual(['Dev', 'Node'])
+  })
+
+  it('recusa repetição dentro de repetição (ReDoS), aceita os termos padrão', () => {
+    for (const bad of ['(a+)+$', String.raw`(\w*)*`, '(x|y+){2,}', '(?:ab+)*c']) expect(hasNestedQuantifier(bad)).toBe(true)
+    for (const ok of [...DEFAULT_SETTINGS.titleTerms, ...DEFAULT_SETTINGS.excludeTerms, String.raw`(c\+\+)+`, '(react|vue)+']) {
+      expect(hasNestedQuantifier(ok)).toBe(false)
+    }
+    expect(() => parseSettings({ ...DEFAULT_SETTINGS, excludeTerms: ['(a+)+$'] })).toThrow(/repetição dentro de repetição/)
   })
 
   it('recusa regex inválida com mensagem clara', () => {

@@ -36,9 +36,16 @@ const cleanList = (max: number, itemMax: number) =>
     .transform((items) => [...new Set(items.map((i) => i.trim()).filter((i) => i.length > 0))])
     .pipe(z.array(z.string().max(itemMax)).max(max))
 
-const regexList = cleanList(300, 200).refine((items) => items.every(isValidRegex), {
-  message: 'Há um termo que não é uma expressão válida. Confira parênteses e colchetes.'
-})
+/** Grupo com quantificador repetido por outro quantificador, ex.: (a+)+ ou (\w*)* — pode travar o app (ReDoS). */
+export const hasNestedQuantifier = (source: string): boolean => /\((?:[^()\\]|\\.)*[+*}](?:[^()\\]|\\.)*\)[+*{]/.test(source)
+
+const regexList = cleanList(300, 200)
+  .refine((items) => items.every(isValidRegex), {
+    message: 'Há um termo que não é uma expressão válida. Confira parênteses e colchetes.'
+  })
+  .refine((items) => !items.some(hasNestedQuantifier), {
+    message: 'Há um termo com repetição dentro de repetição, como (a+)+, que pode travar o app. Simplifique o termo.'
+  })
 
 const d = DEFAULT_SETTINGS
 
