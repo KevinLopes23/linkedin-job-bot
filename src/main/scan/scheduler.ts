@@ -1,7 +1,6 @@
 /** Agendamento da varredura automática enquanto o app está aberto. */
 export class Scheduler {
   private timer: ReturnType<typeof setTimeout> | null = null
-  private nextRunAt: number | null = null
 
   constructor(
     private readonly run: () => void,
@@ -13,22 +12,15 @@ export class Scheduler {
     this.clear()
     if (!enabled || intervalMinutes <= 0) return null
     const delayMs = intervalMinutes * 60_000
-    this.nextRunAt = this.now() + delayMs
     this.timer = setTimeout(() => {
       this.timer = null
-      this.nextRunAt = null
       this.run()
     }, delayMs)
-    return new Date(this.nextRunAt).toISOString()
-  }
-
-  next(): string | null {
-    return this.nextRunAt === null ? null : new Date(this.nextRunAt).toISOString()
+    return new Date(this.now() + delayMs).toISOString()
   }
 
   clear(): void {
     if (this.timer) clearTimeout(this.timer)
     this.timer = null
-    this.nextRunAt = null
   }
 }

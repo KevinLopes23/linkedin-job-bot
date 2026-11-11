@@ -16,7 +16,6 @@ describe('Scheduler', () => {
     expect(run).not.toHaveBeenCalled()
     vi.advanceTimersByTime(60_000)
     expect(run).toHaveBeenCalledOnce()
-    expect(s.next()).toBeNull()
   })
 
   it('desligado não agenda', () => {
