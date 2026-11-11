@@ -95,14 +95,14 @@ export function BoardPage({ jobs, setJobs }: { jobs: readonly Job[]; setJobs: (j
                       onAnimationEnd={() => setJustMoved(null)}
                     >
                       <button type="button" className="kcard__open" onClick={() => setOpenId(job.id)}>
-                        <span className="kcard__top">
-                          <span className="kcard__title">{job.title}</span>
-                          <span className="kcard__score">{job.match ? job.match.score : '—'}</span>
-                        </span>
+                        <span className="kcard__title">{job.title}</span>
                         <span className="kcard__company">{job.company}</span>
                         <span className="kcard__foot">
                           {job.notes && <Icon name="note" size={13} />}
                           {last && <time>{dateTime(last.at)}</time>}
+                          <span className="kcard__score" aria-label={job.match ? `Nota ${job.match.score}` : 'Sem nota'}>
+                            {job.match ? job.match.score : '—'}
+                          </span>
                         </span>
                       </button>
                       <label className="sr-only">
