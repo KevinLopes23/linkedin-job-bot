@@ -14,17 +14,24 @@ describe('requireLinkedInUrl', () => {
 })
 
 describe('isTrustedSender', () => {
-  it('aceita a página do app (empacotada ou dev server)', () => {
-    expect(isTrustedSender('file:///C:/Program%20Files/Vagalume/resources/app.asar/out/renderer/index.html', null)).toBe(true)
-    expect(isTrustedSender('http://localhost:5173/', 'http://localhost:5173')).toBe(true)
+  const appIndex = 'file:///C:/Program%20Files/Vagalume/resources/app.asar/out/renderer/index.html'
+  const dev = 'http://localhost:5173'
+
+  it('aceita exatamente o index do app (também com query/hash e outra caixa do drive) e o dev server', () => {
+    expect(isTrustedSender(appIndex, null, appIndex)).toBe(true)
+    expect(isTrustedSender(`${appIndex}?x=1#topo`, null, appIndex)).toBe(true)
+    expect(isTrustedSender(appIndex.replace('C:', 'c:'), null, appIndex)).toBe(true)
+    expect(isTrustedSender('http://localhost:5173/', dev, appIndex)).toBe(true)
   })
 
   it.each([
-    ['file:///C:/Users/x/Downloads/pagina.html', null],
+    ['file:///C:/Users/x/Downloads/renderer/index.html', null],
+    ['file://evil-host/share/renderer/index.html', null],
+    ['file:///C:/Program%20Files/Vagalume/resources/app.asar/out/renderer/outra.html', null],
     ['http://localhost:5173/', null],
-    ['http://localhost:9999/', 'http://localhost:5173'],
-    ['https://www.linkedin.com/jobs/view/1', 'http://localhost:5173'],
+    ['http://localhost:9999/', dev],
+    ['https://www.linkedin.com/jobs/view/1', dev],
     [undefined, null],
     ['não é url', null]
-  ])('recusa %s', (url, dev) => expect(isTrustedSender(url, dev)).toBe(false))
+  ])('recusa %s', (url, devOrigin) => expect(isTrustedSender(url, devOrigin, appIndex)).toBe(false))
 })

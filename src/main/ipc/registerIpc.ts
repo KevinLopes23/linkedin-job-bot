@@ -1,5 +1,7 @@
 /** Registro dos handlers IPC. Toda entrada vinda do renderer é validada aqui. */
 import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import { IPC } from '../../shared/ipc'
 import type { GeminiTestResult, Job } from '../../shared/types'
@@ -18,14 +20,19 @@ export interface IpcDeps {
   readonly onJobsChanged: (jobs: readonly Job[]) => void
 }
 
+/** URL file:// sem query/hash, em minúsculas (caminho do Windows não diferencia maiúsculas). */
+const normalizeFileUrl = (url: URL): string => `${url.protocol}//${url.host}${url.pathname}`.toLowerCase()
+
 /**
- * Só a página do próprio app chama o IPC: o index.html empacotado (file://) ou o dev server.
- * Defesa em profundidade caso um dia entre iframe/webview na janela.
+ * Só a página do próprio app chama o IPC: exatamente o index.html do app (file://, sem host de rede)
+ * ou a origem do dev server. Defesa em profundidade caso um dia entre iframe/webview na janela.
  */
-export function isTrustedSender(url: string | undefined, devOrigin: string | null): boolean {
+export function isTrustedSender(url: string | undefined, devOrigin: string | null, appIndexUrl: string): boolean {
   if (!url || !URL.canParse(url)) return false
   const parsed = new URL(url)
-  if (parsed.protocol === 'file:') return parsed.pathname.endsWith('/renderer/index.html')
+  if (parsed.protocol === 'file:') {
+    return parsed.host === '' && normalizeFileUrl(parsed) === normalizeFileUrl(new URL(appIndexUrl))
+  }
   return devOrigin !== null && parsed.origin === devOrigin
 }
 
@@ -71,9 +78,11 @@ export function registerIpc(deps: IpcDeps): void {
   const { settings, jobs, history, scan, onJobsChanged } = deps
   const devUrl = !app.isPackaged ? process.env['ELECTRON_RENDERER_URL'] : undefined
   const devOrigin = devUrl && URL.canParse(devUrl) ? new URL(devUrl).origin : null
+  // Mesmo caminho que o index.ts usa no loadFile.
+  const appIndexUrl = pathToFileURL(join(__dirname, '../renderer/index.html')).href
   const handle = (channel: string, listener: (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown): void => {
     ipcMain.handle(channel, (event, ...args) => {
-      if (!isTrustedSender(event.senderFrame?.url, devOrigin)) throw new Error('Chamada de origem não autorizada.')
+      if (!isTrustedSender(event.senderFrame?.url, devOrigin, appIndexUrl)) throw new Error('Chamada de origem não autorizada.')
       return listener(event, ...args)
     })
   }
