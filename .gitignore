@@ -12,7 +12,7 @@ release/
 .env.*
 
 # Dados locais (banco do bot antigo, logs)
-data/
+/data/
 *.db
 *.sqlite
 *.sqlite3
