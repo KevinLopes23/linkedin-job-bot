@@ -131,10 +131,9 @@ export function checkDetail(html: string, candidate: Candidate, maxApplicants: n
     return { ok: false, reason: `é ${model} na página da vaga (busca remota)` }
   }
   if (isPromotedDetail(jobText, jobHtml)) return { ok: false, reason: 'é promovida' }
-  if (model === 'Indefinido') {
-    if (candidate.searchKind === 'remoto') return { ok: false, reason: 'sem modelo de trabalho definido (busca remota)' }
-    model = 'Presencial'
-  }
+  // Sem modelo escrito na vaga: vale o filtro da busca (f_WT=2 remoto; cidade = presencial/híbrido).
+  // A página pública raramente diz "Remoto" na área da vaga; o bot só aprovava porque lia "vagas semelhantes".
+  if (model === 'Indefinido') model = candidate.searchKind === 'remoto' ? 'Remoto' : 'Presencial'
   const applicants = parseApplicants(jobText)
   if (maxApplicants > 0 && applicants !== null && applicants > maxApplicants) {
     return { ok: false, reason: `tem ${applicants} candidatos (limite ${maxApplicants})` }

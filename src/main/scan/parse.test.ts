@@ -114,9 +114,9 @@ describe('checkDetail', () => {
     expect(checkDetail(html, candidate(), 0)).toMatchObject({ ok: true, applicants: 200 })
   })
 
-  it('modelo indefinido: remota descarta, local assume Presencial', () => {
-    const html = detailPage({ body: 'Sem modelo', description: 'Vaga legal' })
-    expect(checkDetail(html, candidate({ model: 'Indefinido' }), 50)).toMatchObject({ ok: false })
+  it('modelo não escrito na vaga: vale o filtro da busca (remota = Remoto, cidade = Presencial)', () => {
+    const html = detailPage({ body: 'Rio de Janeiro e Região', description: 'Vaga legal', similar: 'Outra vaga - Híbrido' })
+    expect(checkDetail(html, candidate({ model: 'Indefinido' }), 50)).toMatchObject({ ok: true, model: 'Remoto' })
     expect(checkDetail(html, candidate({ model: 'Indefinido', searchKind: 'local' }), 50)).toMatchObject({ ok: true, model: 'Presencial' })
   })
 })
