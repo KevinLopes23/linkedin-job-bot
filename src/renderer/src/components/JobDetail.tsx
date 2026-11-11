@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { JOB_STATUSES, type Job } from '../../../shared/types'
 import { dateTime, errorMessage, glow, STATUS_LABEL } from '../lib/format'
 import { Icon } from './Icon'
@@ -10,10 +10,28 @@ export function JobDetail({ job, onClose }: { job: Job; onClose: () => void }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Anotação salva sozinha após uma pausa na digitação, e na hora ao trocar de vaga ou fechar o painel.
+  const pending = useRef<{ id: string; value: string } | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const flush = (): void => {
+    if (timer.current) clearTimeout(timer.current)
+    const p = pending.current
+    pending.current = null
+    if (p) window.vagalume.jobs.setNotes(p.id, p.value).catch((e: unknown) => setError(errorMessage(e)))
+  }
+
   useEffect(() => {
     setNotes(job.notes)
     setError(null)
+    return flush
   }, [job.id])
+
+  const editNotes = (value: string): void => {
+    setNotes(value)
+    pending.current = { id: job.id, value }
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(flush, 700)
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -112,8 +130,8 @@ export function JobDetail({ job, onClose }: { job: Job; onClose: () => void }) {
           rows={4}
           value={notes}
           placeholder="Recrutador, salário, link do teste, próxima etapa…"
-          onChange={(e) => setNotes(e.target.value)}
-          onBlur={() => notes !== job.notes && void run(() => window.vagalume.jobs.setNotes(job.id, notes))}
+          onChange={(e) => editNotes(e.target.value)}
+          onBlur={flush}
         />
       </section>
 
