@@ -124,7 +124,7 @@ export function BoardPage({ jobs, setJobs }: { jobs: readonly Job[]; setJobs: (j
           )
         })}
       </div>
-      {open && <JobDetail job={open} onClose={() => setOpenId(null)} />}
+      {open && <JobDetail key={open.id} job={open} onClose={() => setOpenId(null)} />}
     </div>
   )
 }

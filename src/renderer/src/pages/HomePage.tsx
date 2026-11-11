@@ -86,7 +86,7 @@ export function HomePage({ jobs, scan, onNavigate }: { jobs: readonly Job[]; sca
           </div>
         )}
       </section>
-      {open && <JobDetail job={open} onClose={() => setOpenId(null)} />}
+      {open && <JobDetail key={open.id} job={open} onClose={() => setOpenId(null)} />}
     </div>
   )
 }

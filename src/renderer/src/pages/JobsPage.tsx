@@ -77,7 +77,7 @@ export function JobsPage({ jobs }: { jobs: readonly Job[] }) {
           ))}
         </div>
       )}
-      {open && <JobDetail job={open} onClose={() => setOpenId(null)} />}
+      {open && <JobDetail key={open.id} job={open} onClose={() => setOpenId(null)} />}
     </div>
   )
 }

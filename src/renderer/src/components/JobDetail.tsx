@@ -1,10 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { JOB_STATUSES, type Job } from '../../../shared/types'
 import { dateTime, errorMessage, glow, modelLabel, STATUS_LABEL } from '../lib/format'
 import { Icon } from './Icon'
 import { ScoreRing } from './ScoreRing'
 
-/** Painel lateral com a análise da IA, coluna, anotações e histórico da vaga. */
+/**
+ * Painel lateral com a análise da IA, coluna, anotações e histórico da vaga.
+ * Quem usa passa `key={job.id}`: cada vaga tem o próprio estado (ocupado, erro, anotação),
+ * e a resposta atrasada de uma vaga nunca aparece no painel de outra.
+ */
 export function JobDetail({ job, onClose }: { job: Job; onClose: () => void }) {
   const [notes, setNotes] = useState(job.notes)
   const [busy, setBusy] = useState(false)
@@ -13,18 +17,14 @@ export function JobDetail({ job, onClose }: { job: Job; onClose: () => void }) {
   // Anotação salva sozinha após uma pausa na digitação, e na hora ao trocar de vaga ou fechar o painel.
   const pending = useRef<{ id: string; value: string } | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const flush = (): void => {
+  const flush = useCallback((): void => {
     if (timer.current) clearTimeout(timer.current)
     const p = pending.current
     pending.current = null
     if (p) window.vagalume.jobs.setNotes(p.id, p.value).catch((e: unknown) => setError(errorMessage(e)))
-  }
+  }, [])
 
-  useEffect(() => {
-    setNotes(job.notes)
-    setError(null)
-    return flush
-  }, [job.id])
+  useEffect(() => flush, [flush])
 
   const editNotes = (value: string): void => {
     setNotes(value)
