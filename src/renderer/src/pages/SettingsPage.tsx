@@ -4,6 +4,8 @@ import { Icon } from '../components/Icon'
 import { errorMessage, sessionLabel } from '../lib/format'
 
 interface Form {
+  aiEngine: Settings['aiEngine']
+  claudeModel: string
   keywords: string
   searchRemote: boolean
   cities: string
@@ -26,6 +28,8 @@ interface Form {
 const lines = (text: string): string[] => text.split('\n').map((l) => l.trim()).filter(Boolean)
 
 const toForm = (s: Settings): Form => ({
+  aiEngine: s.aiEngine,
+  claudeModel: s.claudeModel,
   keywords: s.keywords.join('\n'),
   searchRemote: s.searchRemote,
   cities: s.cities.join('\n'),
@@ -46,6 +50,8 @@ const toForm = (s: Settings): Form => ({
 })
 
 const toSettings = (f: Form): Settings => ({
+  aiEngine: f.aiEngine,
+  claudeModel: f.claudeModel,
   keywords: lines(f.keywords),
   searchRemote: f.searchRemote,
   cities: lines(f.cities),
@@ -198,6 +204,12 @@ export function SettingsPage({ initial, onSaved }: { initial: SettingsView; onSa
       if (!r.ok) throw new Error(r.message)
     }, 'Gemini respondeu. Tudo certo.')
 
+  const testClaude = (): Promise<void> =>
+    act(async () => {
+      const r = await window.vagalume.settings.testClaude()
+      if (!r.ok) throw new Error(r.message)
+    }, 'Claude respondeu. Tudo certo.')
+
   return (
     <div className="page page--settings">
       <header className="page__head">
@@ -222,7 +234,39 @@ export function SettingsPage({ initial, onSaved }: { initial: SettingsView; onSa
           </div>
         </Card>
 
-        <Card title="Gemini" lead="Chave gratuita no Google AI Studio. Sem chave, o app funciona e só não dá nota.">
+        <Card title="Motor de análise da IA" lead="Quem dá a nota de match. O Claude local usa o Claude Code deste PC (sua assinatura), sem a sobrecarga do Gemini grátis.">
+          <div className="stack">
+            <label className="check">
+              <input type="radio" name="ai-engine" checked={form.aiEngine === 'gemini'} onChange={() => set('aiEngine', 'gemini')} />
+              Google Gemini — grátis, mas em horário de pico fica sobrecarregado e pode falhar
+            </label>
+            <label className="check">
+              <input type="radio" name="ai-engine" checked={form.aiEngine === 'claude'} onChange={() => set('aiEngine', 'claude')} />
+              Claude local — usa o Claude Code deste computador (confiável, sem sobrecarga)
+            </label>
+          </div>
+          {form.aiEngine === 'claude' && (
+            <>
+              <div className="grid-2">
+                <Field label="Modelo do Claude" hint="Haiku é barato e rápido (recomendado).">
+                  <select className="input" value={form.claudeModel} onChange={(e) => set('claudeModel', e.target.value)}>
+                    <option value="haiku">Haiku — barato e rápido</option>
+                    <option value="sonnet">Sonnet — equilíbrio</option>
+                    <option value="opus">Opus — máximo (mais caro)</option>
+                  </select>
+                </Field>
+              </div>
+              <div className="row">
+                <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => void testClaude()}>
+                  Testar Claude
+                </button>
+                <span className="muted">Precisa do Claude Code instalado e logado. Cada varredura consome um pouco do seu limite. Salve antes de testar se trocou o modelo.</span>
+              </div>
+            </>
+          )}
+        </Card>
+
+        <Card title="Gemini" lead="Chave gratuita no Google AI Studio. Usada só se o motor for o Gemini.">
           <div className="row">
             <span className={`pill${view.hasGeminiKey ? ' pill--on' : view.geminiKeyUnreadable ? ' pill--warn' : ''}`}>
               <Icon name={view.hasGeminiKey ? 'check' : 'key'} size={14} />

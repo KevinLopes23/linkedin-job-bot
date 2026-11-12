@@ -13,6 +13,8 @@ export interface VagalumeApi {
     setGeminiKey(key: string): Promise<SettingsView>
     clearGeminiKey(): Promise<SettingsView>
     testGemini(): Promise<GeminiTestResult>
+    /** Testa o Claude local (CLI do Claude Code deste PC) com o modelo configurado. */
+    testClaude(): Promise<GeminiTestResult>
     /** Abre o seletor de arquivo e devolve o texto do PDF (null se cancelado). */
     importResumePdf(): Promise<string | null>
   }
@@ -52,6 +54,7 @@ export const IPC = {
   settingsSetGeminiKey: 'settings:set-gemini-key',
   settingsClearGeminiKey: 'settings:clear-gemini-key',
   settingsTestGemini: 'settings:test-gemini',
+  settingsTestClaude: 'settings:test-claude',
   settingsImportResume: 'settings:import-resume',
   jobsList: 'jobs:list',
   jobsMove: 'jobs:move',

@@ -19,6 +19,7 @@ const api: VagalumeApi = {
     setGeminiKey: invoke(IPC.settingsSetGeminiKey),
     clearGeminiKey: invoke(IPC.settingsClearGeminiKey),
     testGemini: invoke(IPC.settingsTestGemini),
+    testClaude: invoke(IPC.settingsTestClaude),
     importResumePdf: invoke(IPC.settingsImportResume)
   },
   jobs: {

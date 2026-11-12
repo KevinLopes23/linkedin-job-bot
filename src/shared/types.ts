@@ -37,7 +37,14 @@ export interface Job {
   readonly match: Match | null
 }
 
+/** Qual IA dá a nota de match: Gemini (API Google, grátis) ou Claude local (CLI do Claude Code deste PC). */
+export type AiEngineId = 'gemini' | 'claude'
+
 export interface Settings {
+  /** Motor de análise selecionado. */
+  readonly aiEngine: AiEngineId
+  /** Modelo do Claude local (haiku | sonnet | opus). */
+  readonly claudeModel: string
   /** Palavras-chave das buscas no LinkedIn (uma busca remota e uma por cidade para cada). */
   readonly keywords: readonly string[]
   readonly searchRemote: boolean

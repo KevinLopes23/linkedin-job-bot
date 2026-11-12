@@ -21,8 +21,20 @@ export interface ScanBrowser {
   readonly warning?: string | null
 }
 
+export interface ScoreHooks {
+  /** Progresso (analisadas, total) para a barra de status. */
+  readonly onProgress?: (done: number, total: number) => void
+  /** Avisos não fatais (uma vaga sem nota, formato inesperado) para o log. */
+  readonly onWarn?: (message: string) => void
+}
+
 export interface Scorer {
   scoreJob(job: Job, resume: string): Promise<Match>
+  /**
+   * Opcional: avalia TODAS as vagas de uma vez (o Claude local faz numa chamada só, para gastar
+   * o mínimo). Retorna a nota por id da vaga; ausente = ficou sem nota. Quando presente, o analyze usa este.
+   */
+  scoreAll?(jobs: readonly Job[], resume: string, hooks?: ScoreHooks): Promise<Map<string, Match>>
 }
 
 export interface ScanDeps {
@@ -232,11 +244,13 @@ export class ScanService {
     if (added.length === 0) return 0
     const scorer = this.deps.createScorer(settings)
     if (!scorer || !settings.resumeText.trim()) {
-      this.log('info', 'Nota de match desligada: salve o currículo e a chave do Gemini em Configurações.')
+      this.log('info', 'Nota de match desligada: salve o currículo (e, no Gemini, a chave) em Configurações.')
       return 0
     }
     const queue = added.slice(0, settings.maxAiPerScan)
     if (queue.length < added.length) this.log('info', `IA: analisando ${queue.length} de ${added.length} (limite por varredura).`)
+    // Motor em lote (Claude local): todas as vagas numa chamada só. Gemini segue no laço por vaga abaixo.
+    if (scorer.scoreAll) return this.analyzeBatch(scorer, queue, settings)
     let analyzed = 0
     for (const [index, item] of queue.entries()) {
       this.checkCancel()
@@ -251,6 +265,28 @@ export class ScanService {
         if (isFatalGeminiError(message)) break
       }
       if (index < queue.length - 1) await this.pause(AI_CALL_GAP_MS)
+    }
+    return analyzed
+  }
+
+  /** Lote: um motor (ex.: Claude local) avalia todas as vagas de uma vez. Falha total segue sem nota. */
+  private async analyzeBatch(scorer: Scorer, queue: readonly NewJob[], settings: Settings): Promise<number> {
+    const jobsToScore = queue.map((item) => this.deps.jobs.get(item.id))
+    this.stage('analisando', `Analisando ${queue.length} vaga(s) com a IA`, 0, queue.length)
+    let matches: Map<string, Match>
+    try {
+      matches = await scorer.scoreAll!(jobsToScore, settings.resumeText, {
+        onProgress: (done, total) => this.stage('analisando', `Analisando ${done}/${total} com a IA`, done, total),
+        onWarn: (message) => this.log('aviso', `IA: ${message}`)
+      })
+    } catch (e) {
+      this.log('aviso', `IA: ${errorText(e)}`)
+      return 0
+    }
+    let analyzed = 0
+    for (const [id, match] of matches) {
+      this.deps.onJobsChanged(this.deps.jobs.setMatch(id, match))
+      analyzed++
     }
     return analyzed
   }

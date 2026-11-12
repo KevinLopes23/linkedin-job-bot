@@ -3,7 +3,7 @@ import { app, BrowserWindow, Menu, nativeImage, Notification, session, Tray } fr
 import icon from '../../resources/icon.png?asset'
 import { IPC, type PageId } from '../shared/ipc'
 import type { Job, ScanRecord, Settings } from '../shared/types'
-import { GeminiClient } from './ai/gemini'
+import { createScorer } from './ai/scorer'
 import { JobsRepo, ScanHistoryRepo } from './data/jobsRepo'
 import { DEFAULT_SETTINGS, parseJobs, parseScanHistory, parseStoredSettings } from './data/validation'
 import { registerIpc } from './ipc/registerIpc'
@@ -72,10 +72,7 @@ const scan = new ScanService({
   jobs,
   history,
   settings: () => settings.get(),
-  createScorer: (s) => {
-    const key = settings.getGeminiKey()
-    return key ? new GeminiClient(key, s.geminiModel) : null
-  },
+  createScorer: (s) => createScorer(s, () => settings.getGeminiKey()),
   onStatus: (status) => {
     send(IPC.scanChanged, status)
     tray?.setToolTip(status.running ? `Vagalume · ${status.message}` : 'Vagalume')

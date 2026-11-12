@@ -5,6 +5,8 @@ import { hasNestedQuantifier, isSlowRegex } from './regexSafety'
 import { DEFAULT_CITIES, DEFAULT_EXCLUDE_TERMS, DEFAULT_KEYWORDS, DEFAULT_TITLE_TERMS } from '../scan/filters'
 
 export const DEFAULT_SETTINGS: Settings = {
+  aiEngine: 'claude',
+  claudeModel: 'haiku',
   keywords: DEFAULT_KEYWORDS,
   searchRemote: true,
   cities: DEFAULT_CITIES,
@@ -55,6 +57,8 @@ const regexList = cleanList(300, 200)
 const d = DEFAULT_SETTINGS
 
 const settingsFields = {
+  aiEngine: z.enum(['gemini', 'claude']).default(d.aiEngine),
+  claudeModel: z.enum(['haiku', 'sonnet', 'opus']).default('haiku'),
   keywords: cleanList(30, 80).refine((k) => k.length > 0, { message: 'Informe ao menos uma palavra-chave.' }).default([...d.keywords]),
   searchRemote: z.boolean().default(d.searchRemote),
   cities: cleanList(10, 120).default([...d.cities]),

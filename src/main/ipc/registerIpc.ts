@@ -6,6 +6,8 @@ import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } f
 import { IPC } from '../../shared/ipc'
 import type { GeminiTestResult, Job } from '../../shared/types'
 import { GeminiClient } from '../ai/gemini'
+import { testClaudeLocal } from '../ai/claudeLocal'
+import { createScorer } from '../ai/scorer'
 import type { JobsRepo, ScanHistoryRepo } from '../data/jobsRepo'
 import { parseJobId, parseNotes, parseStatus } from '../data/validation'
 import type { ScanService } from '../scan/scanService'
@@ -68,11 +70,22 @@ async function importResumePdf(): Promise<string | null> {
   return pdfToText(new Uint8Array(await readFile(path)))
 }
 
+async function testClaude(settings: SettingsService): Promise<GeminiTestResult> {
+  const model = settings.get().claudeModel
+  try {
+    await testClaudeLocal(model)
+    return { ok: true, message: `Claude local respondeu (modelo ${model}).` }
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : String(error) }
+  }
+}
+
 async function analyzeOne({ settings, jobs }: IpcDeps, id: string): Promise<readonly Job[]> {
-  const key = settings.getGeminiKey()
-  const { resumeText, geminiModel } = settings.get()
-  if (!key || !resumeText.trim()) throw new Error('Salve o currículo e a chave do Gemini em Configurações.')
-  const match = await new GeminiClient(key, geminiModel).scoreJob(jobs.get(id), resumeText)
+  const s = settings.get()
+  if (!s.resumeText.trim()) throw new Error('Salve o currículo em Configurações para dar a nota.')
+  const scorer = createScorer(s, () => settings.getGeminiKey())
+  if (!scorer) throw new Error('Salve a chave do Gemini (ou escolha o Claude local) em Configurações.')
+  const match = await scorer.scoreJob(jobs.get(id), s.resumeText)
   return jobs.setMatch(id, match)
 }
 
@@ -98,6 +111,7 @@ export function registerIpc(deps: IpcDeps): void {
   handle(IPC.settingsSetGeminiKey, (_e, key: unknown) => settings.setGeminiKey(key))
   handle(IPC.settingsClearGeminiKey, () => settings.clearGeminiKey())
   handle(IPC.settingsTestGemini, () => testGemini(settings))
+  handle(IPC.settingsTestClaude, () => testClaude(settings))
   handle(IPC.settingsImportResume, () => importResumePdf())
 
   handle(IPC.jobsList, () => jobs.list())
