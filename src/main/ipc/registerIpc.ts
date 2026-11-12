@@ -9,6 +9,7 @@ import { GeminiClient } from '../ai/gemini'
 import type { JobsRepo, ScanHistoryRepo } from '../data/jobsRepo'
 import { parseJobId, parseNotes, parseStatus } from '../data/validation'
 import type { ScanService } from '../scan/scanService'
+import type { LinkedInSession } from '../scan/session'
 import { pdfToText } from '../settings/resumePdf'
 import type { SettingsService } from '../settings/settingsService'
 
@@ -17,6 +18,7 @@ export interface IpcDeps {
   readonly jobs: JobsRepo
   readonly history: ScanHistoryRepo
   readonly scan: ScanService
+  readonly linkedin: LinkedInSession
   readonly onJobsChanged: (jobs: readonly Job[]) => void
 }
 
@@ -75,7 +77,7 @@ async function analyzeOne({ settings, jobs }: IpcDeps, id: string): Promise<read
 }
 
 export function registerIpc(deps: IpcDeps): void {
-  const { settings, jobs, history, scan, onJobsChanged } = deps
+  const { settings, jobs, history, scan, linkedin, onJobsChanged } = deps
   const devUrl = !app.isPackaged ? process.env['ELECTRON_RENDERER_URL'] : undefined
   const devOrigin = devUrl && URL.canParse(devUrl) ? new URL(devUrl).origin : null
   // Mesmo caminho que o index.ts usa no loadFile.
@@ -107,6 +109,14 @@ export function registerIpc(deps: IpcDeps): void {
   handle(IPC.scanHistory, () => history.list())
   handle(IPC.scanStart, () => scan.start())
   handle(IPC.scanStop, () => scan.stop())
+
+  // O perfil do Chrome não pode ser aberto por duas janelas: login e varredura não rodam juntos.
+  const requireIdle = (): void => {
+    if (scan.getStatus().running) throw new Error('Espere a varredura terminar (ou pare) antes de mexer no login do LinkedIn.')
+  }
+  handle(IPC.linkedinStatus, () => linkedin.status())
+  handle(IPC.linkedinConnect, () => (requireIdle(), linkedin.connect()))
+  handle(IPC.linkedinDisconnect, () => (requireIdle(), linkedin.disconnect()))
 
   handle(IPC.appVersion, () => app.getVersion())
   handle(IPC.appOpenExternal, (_e, url: unknown) => shell.openExternal(requireLinkedInUrl(url)))

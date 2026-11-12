@@ -15,6 +15,10 @@ export interface ScanBrowser {
   searchHtml(url: string): Promise<string>
   detailHtml(url: string): Promise<string>
   close(): Promise<void>
+  /** Abriu com a sessão do LinkedIn do usuário (depois do open). */
+  readonly isLoggedIn?: boolean
+  /** Aviso da abertura (ex.: a sessão não abriu e a varredura seguiu sem login). */
+  readonly warning?: string | null
 }
 
 export interface Scorer {
@@ -115,6 +119,13 @@ export class ScanService {
     const browser = this.deps.createBrowser()
     try {
       await browser.open()
+      if (browser.warning) this.log('aviso', browser.warning)
+      this.log(
+        'info',
+        browser.isLoggedIn
+          ? 'Usando sua sessão do LinkedIn: o filtro remoto/presencial/híbrido é o do próprio LinkedIn.'
+          : 'Sem login no LinkedIn: a busca mistura os modelos; só passa como remota a vaga que diz isso.'
+      )
       const found = await this.search(browser, settings, record)
       const fresh = this.filter(found)
       record.candidates = fresh.length
@@ -188,7 +199,7 @@ export class ScanService {
       this.checkCancel()
       this.stage('conferindo', `Conferindo ${candidate.title} · ${candidate.company}`, index, candidates.length)
       try {
-        const verdict = checkDetail(await browser.detailHtml(candidate.link), candidate, settings.maxApplicants, settings.onlyPortuguese)
+        const verdict = checkDetail(await browser.detailHtml(candidate.link), candidate, settings.maxApplicants, settings.onlyPortuguese, settings.skipPromoted)
         if (verdict.ok) {
           approved.push({
             ...candidate,

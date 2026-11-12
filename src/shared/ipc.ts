@@ -1,5 +1,5 @@
 /** Contrato IPC compartilhado entre main, preload e renderer. */
-import type { GeminiTestResult, Job, JobStatus, ScanRecord, ScanStatus, Settings, SettingsView } from './types'
+import type { GeminiTestResult, Job, JobStatus, LinkedInSessionView, ScanRecord, ScanStatus, Settings, SettingsView } from './types'
 
 type Listener<T> = (value: T) => void
 type Unsubscribe = () => void
@@ -32,6 +32,12 @@ export interface VagalumeApi {
     onStatus(listener: Listener<ScanStatus>): Unsubscribe
     onHistory(listener: Listener<readonly ScanRecord[]>): Unsubscribe
   }
+  readonly linkedin: {
+    status(): Promise<LinkedInSessionView>
+    /** Abre a janela de login e resolve quando o usuário entra (ou falha se fechar a janela). */
+    connect(): Promise<LinkedInSessionView>
+    disconnect(): Promise<LinkedInSessionView>
+  }
   readonly app: {
     version(): Promise<string>
     /** Abre a vaga no navegador padrão (só links do LinkedIn). */
@@ -58,6 +64,9 @@ export const IPC = {
   scanStop: 'scan:stop',
   scanChanged: 'scan:changed',
   scanHistoryChanged: 'scan:history-changed',
+  linkedinStatus: 'linkedin:status',
+  linkedinConnect: 'linkedin:connect',
+  linkedinDisconnect: 'linkedin:disconnect',
   appVersion: 'app:version',
   appOpenExternal: 'app:open-external',
   appNavigate: 'app:navigate'

@@ -1,7 +1,7 @@
-import { useState, type ReactNode } from 'react'
-import type { Settings, SettingsView } from '../../../shared/types'
+import { useEffect, useState, type ReactNode } from 'react'
+import type { LinkedInSessionView, Settings, SettingsView } from '../../../shared/types'
 import { Icon } from '../components/Icon'
-import { errorMessage } from '../lib/format'
+import { errorMessage, sessionLabel } from '../lib/format'
 
 interface Form {
   keywords: string
@@ -10,6 +10,7 @@ interface Form {
   hoursWindow: string
   maxApplicants: string
   onlyPortuguese: boolean
+  skipPromoted: boolean
   maxPerCompany: string
   titleTerms: string
   excludeTerms: string
@@ -31,6 +32,7 @@ const toForm = (s: Settings): Form => ({
   hoursWindow: String(s.hoursWindow),
   maxApplicants: String(s.maxApplicants),
   onlyPortuguese: s.onlyPortuguese,
+  skipPromoted: s.skipPromoted,
   maxPerCompany: String(s.maxPerCompany),
   titleTerms: s.titleTerms.join('\n'),
   excludeTerms: s.excludeTerms.join('\n'),
@@ -50,6 +52,7 @@ const toSettings = (f: Form): Settings => ({
   hoursWindow: Number(f.hoursWindow),
   maxApplicants: Number(f.maxApplicants),
   onlyPortuguese: f.onlyPortuguese,
+  skipPromoted: f.skipPromoted,
   maxPerCompany: Number(f.maxPerCompany),
   titleTerms: lines(f.titleTerms),
   excludeTerms: lines(f.excludeTerms),
@@ -81,6 +84,75 @@ function Card({ title, lead, children }: { title: string; lead: string; children
       </header>
       {children}
     </section>
+  )
+}
+
+/** Login opcional: a janela abre no Chrome, a senha vai direto para o LinkedIn. */
+function LinkedInCard() {
+  const [session, setSession] = useState<LinkedInSessionView | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    void window.vagalume.linkedin.status().then((s) => alive && setSession(s))
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const run = async (fn: () => Promise<LinkedInSessionView>, connecting: boolean): Promise<void> => {
+    setBusy(true)
+    setError(null)
+    if (connecting) setSession((s) => (s ? { ...s, connecting: true } : s))
+    try {
+      setSession(await fn())
+    } catch (e) {
+      setError(errorMessage(e))
+      setSession(await window.vagalume.linkedin.status())
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const connected = session?.connected ?? false
+  return (
+    <Card
+      title="Conta do LinkedIn (opcional)"
+      lead="Logado, o LinkedIn respeita o filtro remoto/híbrido/presencial e mostra o modelo de cada vaga. Sem login o app funciona, mas a busca mistura os modelos."
+    >
+      <div className="row">
+        <span className={`pill${connected ? ' pill--on' : session?.expired ? ' pill--warn' : ''}`}>
+          <Icon name={connected ? 'check' : 'key'} size={14} />
+          {sessionLabel(session)}
+        </span>
+      </div>
+      <div className="row">
+        <button
+          type="button"
+          className="btn"
+          disabled={busy || session === null}
+          onClick={() => void run(() => window.vagalume.linkedin.connect(), true)}
+        >
+          {connected ? 'Entrar de novo' : 'Conectar LinkedIn'}
+        </button>
+        <button
+          type="button"
+          className="btn btn--ghost"
+          disabled={busy || !(connected || session?.expired)}
+          onClick={() => void run(() => window.vagalume.linkedin.disconnect(), false)}
+        >
+          Desconectar
+        </button>
+      </div>
+      {error && <p className="savebar__msg savebar__msg--erro">{error}</p>}
+      <p className="muted">
+        A janela do Chrome abre na página do LinkedIn: a senha vai direto para o site, o Vagalume não vê. A sessão fica só neste
+        computador, num perfil separado do seu Chrome; "Desconectar" apaga tudo. O app só lê vagas (não se candidata nem manda
+        mensagem) e mantém pausas entre as páginas, mas o LinkedIn não gosta de automação em conta logada: não diminua muito a
+        pausa nem o intervalo.
+      </p>
+    </Card>
   )
 }
 
@@ -203,6 +275,8 @@ export function SettingsPage({ initial, onSaved }: { initial: SettingsView; onSa
           </div>
         </Card>
 
+        <LinkedInCard />
+
         <Card title="Busca" lead="Os valores iniciais são os mesmos do bot antigo.">
           <div className="grid-2">
             <Field label="Palavras-chave" hint="Uma por linha. Cada uma vira uma busca remota e uma por cidade.">
@@ -216,6 +290,10 @@ export function SettingsPage({ initial, onSaved }: { initial: SettingsView; onSa
               <label className="check">
                 <input type="checkbox" checked={form.onlyPortuguese} onChange={(e) => set('onlyPortuguese', e.target.checked)} />
                 Só vagas em português (descarta descrição em inglês)
+              </label>
+              <label className="check">
+                <input type="checkbox" checked={form.skipPromoted} onChange={(e) => set('skipPromoted', e.target.checked)} />
+                Descartar vagas promovidas (“Promovida por quem está contratando”, só aparece com login)
               </label>
               <Field label="Cidades (presencial e híbrido)" hint='Uma por linha, como no LinkedIn: "Bauru, São Paulo, Brasil".'>
                 <textarea className="input textarea" rows={3} value={form.cities} onChange={(e) => set('cities', e.target.value)} />

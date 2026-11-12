@@ -127,6 +127,11 @@ describe('checkDetail', () => {
     expect(checkDetail(detailPage({ body: 'Remoto · Promovida por quem está contratando' }), candidate(), 50)).toMatchObject({ ok: false, reason: 'é promovida' })
   })
 
+  it('com "descartar promovidas" desligado, a vaga promovida passa', () => {
+    const html = detailPage({ body: 'Remoto · Promovida por quem está contratando' })
+    expect(checkDetail(html, candidate(), 50, false, false)).toMatchObject({ ok: true, model: 'Remoto' })
+  })
+
   it('descarta acima do limite de candidatos e ignora o limite quando 0', () => {
     const html = detailPage({ body: 'Remoto · Mais de 200 candidaturas' })
     expect(checkDetail(html, candidate(), 50)).toMatchObject({ ok: false })

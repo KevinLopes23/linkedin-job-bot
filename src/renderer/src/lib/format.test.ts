@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { errorMessage, glow, matchesModel, modelLabel, scoreTone, timeAgo, timeUntil } from './format'
+import { errorMessage, glow, matchesModel, modelLabel, scoreTone, sessionLabel, timeAgo, timeUntil } from './format'
 
 const now = Date.parse('2026-11-11T12:00:00.000Z')
 
@@ -30,6 +30,15 @@ describe('format', () => {
 
   it('limpa o prefixo do erro do IPC', () => {
     expect(errorMessage(new Error("Error invoking remote method 'jobs:move': Error: Coluna inválida."))).toBe('Coluna inválida.')
+  })
+
+  it('estado do login do LinkedIn em texto', () => {
+    const base = { connected: false, connectedAt: null, expired: false, connecting: false }
+    expect(sessionLabel(null)).toBe('Verificando…')
+    expect(sessionLabel(base)).toMatch(/^Não conectado/)
+    expect(sessionLabel({ ...base, connecting: true })).toMatch(/janela de login/i)
+    expect(sessionLabel({ ...base, connected: true, connectedAt: '2026-11-12T13:30:00.000Z' })).toMatch(/^Conectado em \d{2}\/11\/2026/)
+    expect(sessionLabel({ ...base, expired: true, connectedAt: '2026-11-12T13:30:00.000Z' })).toMatch(/expirou/)
   })
 
   it('vaga da cidade sem modelo escrito aparece como "Presencial ou híbrido" e nos dois filtros (B2)', () => {

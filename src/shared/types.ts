@@ -47,6 +47,8 @@ export interface Settings {
   readonly maxApplicants: number
   /** Descarta vagas com a descrição em inglês. */
   readonly onlyPortuguese: boolean
+  /** Descarta vaga "Promovida por quem está contratando" (impulsionada pela empresa). */
+  readonly skipPromoted: boolean
   readonly maxPerCompany: number
   /** Regex (uma por linha): o título precisa casar com pelo menos uma. */
   readonly titleTerms: readonly string[]
@@ -67,7 +69,17 @@ export interface SettingsView extends Settings {
   readonly geminiKeyUnreadable: boolean
 }
 
-export type ScanStage = 'buscando' | 'filtrando' | 'conferindo' | 'analisando'
+/** Login opcional no LinkedIn (perfil do Chrome só do Vagalume). */
+export interface LinkedInSessionView {
+  readonly connected: boolean
+  readonly connectedAt: string | null
+  /** O LinkedIn pediu login de novo numa varredura: precisa reconectar. */
+  readonly expired: boolean
+  /** A janela de login está aberta agora. */
+  readonly connecting: boolean
+}
+
+export type ScanStage ='buscando' | 'filtrando' | 'conferindo' | 'analisando'
 export type LogLevel = 'info' | 'ok' | 'aviso' | 'erro'
 
 export interface LogEntry {

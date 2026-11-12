@@ -36,6 +36,11 @@ const api: VagalumeApi = {
     onStatus: (listener) => subscribe(IPC.scanChanged, listener),
     onHistory: (listener) => subscribe(IPC.scanHistoryChanged, listener)
   },
+  linkedin: {
+    status: invoke(IPC.linkedinStatus),
+    connect: invoke(IPC.linkedinConnect),
+    disconnect: invoke(IPC.linkedinDisconnect)
+  },
   app: {
     version: invoke(IPC.appVersion),
     openExternal: invoke(IPC.appOpenExternal),

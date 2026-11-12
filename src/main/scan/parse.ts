@@ -139,7 +139,7 @@ function descriptionText($: cheerio.CheerioAPI): string {
  * Confere a página da vaga: modelo real, promovida, limite de candidatos. Também extrai a descrição.
  * Lê só a área da vaga: o resto da página lista outras vagas ("... - Híbrido") e enganava a detecção.
  */
-export function checkDetail(html: string, candidate: Candidate, maxApplicants: number, onlyPortuguese = false): DetailVerdict {
+export function checkDetail(html: string, candidate: Candidate, maxApplicants: number, onlyPortuguese = false, skipPromoted = true): DetailVerdict {
   const $ = cheerio.load(html)
   const scope = $(JOB_SCOPE)
   // Sem a área da vaga (LinkedIn pediu login): não aprova nem grava; a vaga volta na próxima varredura.
@@ -151,7 +151,7 @@ export function checkDetail(html: string, candidate: Candidate, maxApplicants: n
   if (candidate.searchKind === 'remoto' && (model === 'Presencial' || model === 'Híbrido')) {
     return { ok: false, reason: `é ${model} na página da vaga (busca remota)` }
   }
-  if (isPromotedDetail(jobText, jobHtml)) return { ok: false, reason: 'é promovida' }
+  if (skipPromoted && isPromotedDetail(jobText, jobHtml)) return { ok: false, reason: 'é promovida' }
   // Sem login o LinkedIn ignora o filtro de modelo (f_WT): a busca "remota" traz vagas presenciais também,
   // e a página pública não mostra o modelo. Então só passa como remota a vaga que diz isso no título,
   // no card ou na descrição. Na busca por cidade fica Indefinido (a tela mostra "Presencial ou híbrido").

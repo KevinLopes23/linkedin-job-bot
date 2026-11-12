@@ -254,7 +254,7 @@ export function isPromotedDetail(bodyText: string, html: string): boolean {
 /** Número de candidatos citado na página ("37 candidaturas", "mais de 200 candidaturas", "over 100 applicants"). */
 export function parseApplicants(bodyText: string): number | null {
   const t = bodyText.toLowerCase()
-  const exact = t.match(/(\d+)\s+(pessoas clicaram em|candidatura|applicant)/i)
+  const exact = t.match(/(\d+)\s+(pessoas clicaram em|people clicked|candidatura|applicant)/i)
   if (exact?.[1]) return parseInt(exact[1], 10)
   const over = t.match(/mais de (\d+)\s+(candidatura|applicant)/i) ?? t.match(/over (\d+)\s+applicant/i)
   if (over?.[1]) return parseInt(over[1], 10)

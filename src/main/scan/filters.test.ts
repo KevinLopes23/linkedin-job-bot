@@ -113,6 +113,7 @@ describe('parseApplicants', () => {
     ['Mais de 200 candidaturas', 200],
     ['Over 100 applicants', 100],
     ['12 pessoas clicaram em Candidatar-se', 12],
+    ['Brazil · 2 hours ago · 31 people clicked apply', 31],
     ['Seja um dos 25 primeiros', null]
   ])('%s → %s', (text, expected) => expect(parseApplicants(text)).toBe(expected))
 })

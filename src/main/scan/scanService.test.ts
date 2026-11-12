@@ -55,6 +55,17 @@ function setup(
 }
 
 describe('ScanService', () => {
+  it('diz no log se a varredura usa a sessão do LinkedIn ou as páginas públicas', async () => {
+    const logged = setup({ browser: { isLoggedIn: true } })
+    logged.service.start()
+    await logged.service.whenIdle()
+    expect(logged.service.getStatus().log.map((l) => l.message)).toContainEqual(expect.stringContaining('Usando sua sessão do LinkedIn'))
+    const guest = setup()
+    guest.service.start()
+    await guest.service.whenIdle()
+    expect(guest.service.getStatus().log.map((l) => l.message)).toContainEqual(expect.stringContaining('Sem login no LinkedIn'))
+  })
+
   it('busca, filtra, confere, aplica anti-spam e guarda', async () => {
     const { service, jobs, history, statuses } = setup()
     service.start()

@@ -7,8 +7,9 @@ import { GeminiClient } from './ai/gemini'
 import { JobsRepo, ScanHistoryRepo } from './data/jobsRepo'
 import { DEFAULT_SETTINGS, parseJobs, parseScanHistory, parseStoredSettings } from './data/validation'
 import { registerIpc } from './ipc/registerIpc'
-import { LinkedInBrowser } from './scan/linkedin'
+import { launchProfile, LinkedInBrowser } from './scan/linkedin'
 import { ScanService } from './scan/scanService'
+import { LinkedInSession } from './scan/session'
 import { parseSecrets, SettingsService, type Secrets } from './settings/settingsService'
 import { JsonFile } from './store/jsonFile'
 
@@ -63,8 +64,11 @@ function notifyNewJobs(items: readonly Job[]): void {
   }
 }
 
+/** Login opcional: perfil do Chrome só do Vagalume, separado do Chrome do usuário. */
+const linkedin = new LinkedInSession(join(dataDir, 'linkedin-profile'), launchProfile)
+
 const scan = new ScanService({
-  createBrowser: () => new LinkedInBrowser(),
+  createBrowser: () => new LinkedInBrowser({ profileDir: linkedin.activeProfile(), onLoggedOut: () => linkedin.markExpired() }),
   jobs,
   history,
   settings: () => settings.get(),
@@ -153,7 +157,7 @@ if (!app.requestSingleInstanceLock()) {
     // O app não precisa de câmera, microfone, localização etc.
     session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false))
     session.defaultSession.setPermissionCheckHandler(() => false)
-    registerIpc({ settings, jobs, history, scan, onJobsChanged: (list) => send(IPC.jobsChanged, list) })
+    registerIpc({ settings, jobs, history, scan, linkedin, onJobsChanged: (list) => send(IPC.jobsChanged, list) })
     mainWindow = createWindow()
     tray = createTray()
     scan.reschedule()

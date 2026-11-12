@@ -1,4 +1,4 @@
-import type { JobStatus, WorkModel } from '../../../shared/types'
+import type { JobStatus, LinkedInSessionView, WorkModel } from '../../../shared/types'
 
 export const STATUS_LABEL: Record<JobStatus, string> = {
   nova: 'Nova',
@@ -14,6 +14,17 @@ export const modelLabel = (model: WorkModel): string => (model === 'Indefinido' 
 /** Filtro por modelo: vaga sem modelo escrito (busca por cidade) entra em Presencial e em Híbrido. */
 export const matchesModel = (model: WorkModel, filter: WorkModel): boolean =>
   model === filter || (model === 'Indefinido' && (filter === 'Presencial' || filter === 'Híbrido'))
+
+/** Situação do login opcional do LinkedIn, para a tela de Configurações. */
+export function sessionLabel(view: LinkedInSessionView | null): string {
+  if (!view) return 'Verificando…'
+  if (view.connecting) return 'Janela de login aberta: entre na sua conta do LinkedIn por lá.'
+  if (view.connected && view.connectedAt) {
+    return `Conectado em ${new Date(view.connectedAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}.`
+  }
+  if (view.expired) return 'A sessão expirou: conecte de novo. Até lá a varredura segue sem login.'
+  return 'Não conectado: a varredura usa as páginas públicas (sem filtro de modelo do LinkedIn).'
+}
 
 /** Mensagem limpa de um erro vindo do IPC (sem o prefixo técnico do Electron). */
 export function errorMessage(error: unknown): string {
