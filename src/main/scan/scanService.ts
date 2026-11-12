@@ -188,7 +188,7 @@ export class ScanService {
       this.checkCancel()
       this.stage('conferindo', `Conferindo ${candidate.title} · ${candidate.company}`, index, candidates.length)
       try {
-        const verdict = checkDetail(await browser.detailHtml(candidate.link), candidate, settings.maxApplicants)
+        const verdict = checkDetail(await browser.detailHtml(candidate.link), candidate, settings.maxApplicants, settings.onlyPortuguese)
         if (verdict.ok) {
           approved.push({
             ...candidate,

@@ -45,6 +45,8 @@ export interface Settings {
   readonly cities: readonly string[]
   readonly hoursWindow: number
   readonly maxApplicants: number
+  /** Descarta vagas com a descrição em inglês. */
+  readonly onlyPortuguese: boolean
   readonly maxPerCompany: number
   /** Regex (uma por linha): o título precisa casar com pelo menos uma. */
   readonly titleTerms: readonly string[]

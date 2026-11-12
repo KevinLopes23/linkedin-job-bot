@@ -1,6 +1,7 @@
 /** Leitura do HTML público do LinkedIn (lista de busca e página da vaga). Funções puras. */
 import * as cheerio from 'cheerio'
 import type { SearchKind, WorkModel } from '../../shared/types'
+import { isEnglish } from './language'
 import {
   cityKey,
   isPromotedCard,
@@ -138,7 +139,7 @@ function descriptionText($: cheerio.CheerioAPI): string {
  * Confere a página da vaga: modelo real, promovida, limite de candidatos. Também extrai a descrição.
  * Lê só a área da vaga: o resto da página lista outras vagas ("... - Híbrido") e enganava a detecção.
  */
-export function checkDetail(html: string, candidate: Candidate, maxApplicants: number): DetailVerdict {
+export function checkDetail(html: string, candidate: Candidate, maxApplicants: number, onlyPortuguese = false): DetailVerdict {
   const $ = cheerio.load(html)
   const scope = $(JOB_SCOPE)
   // Sem a área da vaga (LinkedIn pediu login): não aprova nem grava; a vaga volta na próxima varredura.
@@ -159,5 +160,7 @@ export function checkDetail(html: string, candidate: Candidate, maxApplicants: n
   if (maxApplicants > 0 && applicants !== null && applicants > maxApplicants) {
     return { ok: false, reason: `tem ${applicants} candidatos (limite ${maxApplicants})` }
   }
-  return { ok: true, model, applicants, description: descriptionText($) }
+  const description = descriptionText($)
+  if (onlyPortuguese && isEnglish(`${candidate.title}\n${description}`)) return { ok: false, reason: 'está em inglês' }
+  return { ok: true, model, applicants, description }
 }

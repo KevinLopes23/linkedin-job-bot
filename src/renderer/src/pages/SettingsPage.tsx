@@ -9,6 +9,7 @@ interface Form {
   cities: string
   hoursWindow: string
   maxApplicants: string
+  onlyPortuguese: boolean
   maxPerCompany: string
   titleTerms: string
   excludeTerms: string
@@ -29,6 +30,7 @@ const toForm = (s: Settings): Form => ({
   cities: s.cities.join('\n'),
   hoursWindow: String(s.hoursWindow),
   maxApplicants: String(s.maxApplicants),
+  onlyPortuguese: s.onlyPortuguese,
   maxPerCompany: String(s.maxPerCompany),
   titleTerms: s.titleTerms.join('\n'),
   excludeTerms: s.excludeTerms.join('\n'),
@@ -47,6 +49,7 @@ const toSettings = (f: Form): Settings => ({
   cities: lines(f.cities),
   hoursWindow: Number(f.hoursWindow),
   maxApplicants: Number(f.maxApplicants),
+  onlyPortuguese: f.onlyPortuguese,
   maxPerCompany: Number(f.maxPerCompany),
   titleTerms: lines(f.titleTerms),
   excludeTerms: lines(f.excludeTerms),
@@ -209,6 +212,10 @@ export function SettingsPage({ initial, onSaved }: { initial: SettingsView; onSa
               <label className="check">
                 <input type="checkbox" checked={form.searchRemote} onChange={(e) => set('searchRemote', e.target.checked)} />
                 Vagas remotas no Brasil
+              </label>
+              <label className="check">
+                <input type="checkbox" checked={form.onlyPortuguese} onChange={(e) => set('onlyPortuguese', e.target.checked)} />
+                Só vagas em português (descarta descrição em inglês)
               </label>
               <Field label="Cidades (presencial e híbrido)" hint='Uma por linha, como no LinkedIn: "Bauru, São Paulo, Brasil".'>
                 <textarea className="input textarea" rows={3} value={form.cities} onChange={(e) => set('cities', e.target.value)} />

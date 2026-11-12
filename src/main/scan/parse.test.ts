@@ -133,6 +133,16 @@ describe('checkDetail', () => {
     expect(checkDetail(html, candidate(), 0)).toMatchObject({ ok: true, applicants: 200 })
   })
 
+  it('só português: descarta vaga com descrição em inglês; desligado, aprova', () => {
+    const html = detailPage({
+      body: 'Remoto',
+      description:
+        '<p>This position is listed on behalf of a partner company. We are looking for a software engineer and you will work with our team on the product.</p>'
+    })
+    expect(checkDetail(html, candidate(), 50, true)).toMatchObject({ ok: false, reason: 'está em inglês' })
+    expect(checkDetail(html, candidate(), 50, false)).toMatchObject({ ok: true })
+  })
+
   it('modelo não escrito na vaga: remota vale o filtro (Remoto); cidade fica Indefinido (presencial ou híbrido)', () => {
     const html = detailPage({ body: 'Rio de Janeiro e Região', description: 'Vaga legal', similar: 'Outra vaga - Híbrido' })
     expect(checkDetail(html, candidate({ model: 'Indefinido' }), 50)).toMatchObject({ ok: true, model: 'Remoto' })

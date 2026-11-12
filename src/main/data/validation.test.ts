@@ -15,6 +15,12 @@ describe('settings', () => {
     expect(DEFAULT_SETTINGS.cities).toEqual(['Bauru, São Paulo, Brasil'])
   })
 
+  it('só vagas em português vem ligado (arquivo antigo, sem o campo, também)', () => {
+    expect(DEFAULT_SETTINGS.onlyPortuguese).toBe(true)
+    expect(parseStoredSettings({ maxApplicants: 10 }).onlyPortuguese).toBe(true)
+    expect(parseStoredSettings({ onlyPortuguese: false }).onlyPortuguese).toBe(false)
+  })
+
   it('arquivo vazio ou parcial completa com o padrão', () => {
     expect(parseStoredSettings({})).toEqual(DEFAULT_SETTINGS)
     expect(parseStoredSettings({ maxApplicants: 10 }).maxApplicants).toBe(10)
