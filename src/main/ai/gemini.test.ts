@@ -1,6 +1,25 @@
-import { ApiError } from '@google/genai'
+import { ApiError, type GoogleGenAI } from '@google/genai'
 import { describe, expect, it } from 'vitest'
-import { buildJobPrompt, describeGeminiError, isFatalGeminiError, parseMatchResponse } from './gemini'
+import type { Job } from '../../shared/types'
+import {
+  buildJobPrompt,
+  createGenAI,
+  describeGeminiError,
+  FALLBACK_MODEL,
+  GeminiClient,
+  isFatalGeminiError,
+  parseMatchResponse
+} from './gemini'
+
+describe('createGenAI', () => {
+  it('usa a API v1beta: na v1 o alias padrão gemini-flash-latest dá 404', () => {
+    expect(createGenAI('chave')['apiVersion']).toBe('v1beta')
+  })
+
+  it('limita cada chamada a 90 s: com o Gemini sobrecarregado a varredura ficava presa', () => {
+    expect(createGenAI('chave')['httpOptions']?.timeout).toBe(90_000)
+  })
+})
 
 describe('parseMatchResponse', () => {
   it('valida e arredonda a nota', () => {
@@ -32,8 +51,51 @@ describe('buildJobPrompt', () => {
   })
 })
 
+describe('GeminiClient: modelo reserva', () => {
+  const okResponse = { text: JSON.stringify({ score: 80, strengths: ['Node'], gaps: [], summary: 'Vale aplicar.' }) }
+  const fakeAi = (failing: ReadonlySet<string>, status = 429) => {
+    const calls: string[] = []
+    const ai = {
+      models: {
+        generateContent: async ({ model }: { model: string }) => {
+          calls.push(model)
+          if (failing.has(model)) throw new ApiError({ status, message: 'RESOURCE_EXHAUSTED' })
+          return okResponse
+        }
+      }
+    }
+    return { ai: ai as unknown as GoogleGenAI, calls }
+  }
+  const job = { title: 'Dev', company: 'X', location: 'BR', model: 'Remoto', description: 'Node' } as unknown as Job
+
+  it('limite no modelo escolhido: tenta o flash-lite e segue nele', async () => {
+    const { ai, calls } = fakeAi(new Set(['gemini-flash-latest']))
+    const client = new GeminiClient('k', 'gemini-flash-latest', ai)
+    expect((await client.scoreJob(job, 'cv')).score).toBe(80)
+    await client.scoreJob(job, 'cv')
+    expect(calls).toEqual(['gemini-flash-latest', FALLBACK_MODEL, FALLBACK_MODEL])
+  })
+
+  it('outros erros não trocam de modelo', async () => {
+    const { ai, calls } = fakeAi(new Set(['gemini-flash-latest']), 403)
+    await expect(new GeminiClient('k', 'gemini-flash-latest', ai).scoreJob(job, 'cv')).rejects.toThrow(/Chave/)
+    expect(calls).toEqual(['gemini-flash-latest'])
+  })
+
+  it('reserva também no limite: devolve a mensagem de limite', async () => {
+    const { ai } = fakeAi(new Set(['gemini-flash-latest', FALLBACK_MODEL]))
+    await expect(new GeminiClient('k', 'gemini-flash-latest', ai).test()).rejects.toThrow(/Limite/)
+  })
+})
+
 describe('erros do Gemini', () => {
   const api = (status: number, message: string): ApiError => new ApiError({ status, message })
+
+  it('timeout do SDK vira mensagem clara e para a IA na varredura', () => {
+    const msg = describeGeminiError(Object.assign(new Error('This operation was aborted'), { name: 'AbortError' }))
+    expect(msg).toMatch(/demorou demais/)
+    expect(isFatalGeminiError(msg)).toBe(true)
+  })
 
   it('classifica pelo status HTTP do ApiError', () => {
     expect(describeGeminiError(api(400, 'API key not valid. Please pass a valid API key. API_KEY_INVALID'))).toMatch(/Chave/)

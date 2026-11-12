@@ -47,6 +47,7 @@ export function parseMatchResponse(text: string, at = new Date().toISOString()):
 const KEY_ERROR = 'Chave do Gemini inválida ou sem permissão.'
 const LIMIT_ERROR = 'Limite do Gemini atingido. Tente mais tarde ou reduza as análises por varredura.'
 const MODEL_ERROR = 'Modelo do Gemini não encontrado. Confira o nome do modelo em Configurações.'
+const TIMEOUT_ERROR = 'O Gemini demorou demais para responder (está sobrecarregado). Tente mais tarde.'
 
 /** Status HTTP do ApiError do @google/genai, quando houver. */
 const httpStatus = (error: unknown): number | null => {
@@ -58,6 +59,7 @@ const httpStatus = (error: unknown): number | null => {
 export function describeGeminiError(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error)
   if (error instanceof z.ZodError || error instanceof SyntaxError) return 'O Gemini respondeu num formato inesperado.'
+  if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) return TIMEOUT_ERROR
   const status = httpStatus(error)
   if (status !== null) {
     // Chave inválida chega como 400 INVALID_ARGUMENT com o motivo API_KEY_INVALID.
@@ -72,8 +74,8 @@ export function describeGeminiError(error: unknown): string {
   return `Falha no Gemini: ${raw.slice(0, 200)}`
 }
 
-/** Erros que não adianta repetir na mesma varredura (chave, limite, modelo). */
-export const isFatalGeminiError = (message: string): boolean => /Chave|Limite|Modelo/.test(message)
+/** Erros que não adianta repetir na mesma varredura (chave, limite, modelo, sobrecarga). */
+export const isFatalGeminiError = (message: string): boolean => /Chave|Limite|Modelo|demorou demais/.test(message)
 
 export function buildJobPrompt(job: Pick<Job, 'title' | 'company' | 'location' | 'model' | 'description'>, resume: string): string {
   const vaga = sanitize(
@@ -82,20 +84,34 @@ export function buildJobPrompt(job: Pick<Job, 'title' | 'company' | 'location' |
   return `<curriculo>\n${sanitize(resume)}\n</curriculo>\n\n<vaga>\n${vaga}\n</vaga>`
 }
 
+/** Com o Gemini sobrecarregado uma chamada pode levar minutos e prender a varredura. */
+const GEMINI_TIMEOUT_MS = 90_000
+
+/**
+ * O SDK usa a API v1 por padrão, onde aliases como `gemini-flash-latest` dão 404;
+ * na v1beta eles existem (e o JSON Schema de resposta também).
+ */
+export const createGenAI = (apiKey: string): GoogleGenAI => new GoogleGenAI({ apiKey, apiVersion: 'v1beta', httpOptions: { timeout: GEMINI_TIMEOUT_MS } })
+
+/** Modelo com cota gratuita maior: usado quando o escolhido bate no limite (429). */
+export const FALLBACK_MODEL = 'gemini-flash-lite-latest'
+
+type GenerateParams = Omit<Parameters<GoogleGenAI['models']['generateContent']>[0], 'model'>
+
 export class GeminiClient {
-  private readonly ai: GoogleGenAI
+  private model: string
 
   constructor(
     apiKey: string,
-    private readonly model: string
+    model: string,
+    private readonly ai: GoogleGenAI = createGenAI(apiKey)
   ) {
-    this.ai = new GoogleGenAI({ apiKey })
+    this.model = model
   }
 
   async scoreJob(job: Job, resume: string): Promise<Match> {
     try {
-      const response = await this.ai.models.generateContent({
-        model: this.model,
+      const response = await this.generate({
         contents: buildJobPrompt(job, resume),
         config: {
           systemInstruction: INSTRUCTIONS,
@@ -112,9 +128,20 @@ export class GeminiClient {
 
   async test(): Promise<void> {
     try {
-      await this.ai.models.generateContent({ model: this.model, contents: 'Responda apenas: ok' })
+      await this.generate({ contents: 'Responda apenas: ok' })
     } catch (error) {
       throw new Error(describeGeminiError(error), { cause: error })
+    }
+  }
+
+  /** No limite do modelo escolhido, passa para o reserva e continua nele pelo resto da varredura. */
+  private async generate(params: GenerateParams) {
+    try {
+      return await this.ai.models.generateContent({ ...params, model: this.model })
+    } catch (error) {
+      if (httpStatus(error) !== 429 || this.model === FALLBACK_MODEL) throw error
+      this.model = FALLBACK_MODEL
+      return this.ai.models.generateContent({ ...params, model: this.model })
     }
   }
 }
