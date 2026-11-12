@@ -48,6 +48,8 @@ const KEY_ERROR = 'Chave do Gemini inválida ou sem permissão.'
 const LIMIT_ERROR = 'Limite do Gemini atingido. Tente mais tarde ou reduza as análises por varredura.'
 const MODEL_ERROR = 'Modelo do Gemini não encontrado. Confira o nome do modelo em Configurações.'
 const TIMEOUT_ERROR = 'O Gemini demorou demais para responder (está sobrecarregado). Tente mais tarde.'
+const OVERLOAD_ERROR =
+  'O Gemini está sobrecarregado agora (HTTP 503), inclusive no modelo reserva. As vagas ficaram sem nota: use "Analisar" na vaga daqui a pouco.'
 
 /** Status HTTP do ApiError do @google/genai, quando houver. */
 const httpStatus = (error: unknown): number | null => {
@@ -66,6 +68,7 @@ export function describeGeminiError(error: unknown): string {
     if (status === 401 || status === 403 || (status === 400 && /API_KEY_INVALID|\bapi key not valid\b/i.test(raw))) return KEY_ERROR
     if (status === 429) return LIMIT_ERROR
     if (status === 404) return MODEL_ERROR
+    if (status === 503) return OVERLOAD_ERROR
     return `Falha no Gemini (HTTP ${status}): ${raw.slice(0, 200)}`
   }
   if (/API_KEY_INVALID|PERMISSION_DENIED|\bapi key\b/i.test(raw)) return KEY_ERROR
@@ -75,7 +78,7 @@ export function describeGeminiError(error: unknown): string {
 }
 
 /** Erros que não adianta repetir na mesma varredura (chave, limite, modelo, sobrecarga). */
-export const isFatalGeminiError = (message: string): boolean => /Chave|Limite|Modelo|demorou demais/.test(message)
+export const isFatalGeminiError = (message: string): boolean => /Chave|Limite|Modelo|demorou demais|sobrecarregado agora/.test(message)
 
 export function buildJobPrompt(job: Pick<Job, 'title' | 'company' | 'location' | 'model' | 'description'>, resume: string): string {
   const vaga = sanitize(
@@ -98,13 +101,21 @@ export const FALLBACK_MODEL = 'gemini-flash-lite-latest'
 
 type GenerateParams = Omit<Parameters<GoogleGenAI['models']['generateContent']>[0], 'model'>
 
+/** Erros de servidor passageiros ("high demand"): vale esperar e tentar de novo. */
+const OVERLOAD_STATUSES: ReadonlySet<number> = new Set([500, 502, 503, 504])
+const OVERLOAD_RETRY_MS = 5_000
+const isOverload = (error: unknown): boolean => OVERLOAD_STATUSES.has(httpStatus(error) ?? 0)
+
+const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+
 export class GeminiClient {
   private model: string
 
   constructor(
     apiKey: string,
     model: string,
-    private readonly ai: GoogleGenAI = createGenAI(apiKey)
+    private readonly ai: GoogleGenAI = createGenAI(apiKey),
+    private readonly sleep: (ms: number) => Promise<void> = defaultSleep
   ) {
     this.model = model
   }
@@ -134,14 +145,33 @@ export class GeminiClient {
     }
   }
 
-  /** No limite do modelo escolhido, passa para o reserva e continua nele pelo resto da varredura. */
+  /**
+   * Limite (429): passa direto para o reserva. Sobrecarga (503 e afins): espera, tenta de novo no mesmo
+   * modelo e, se continuar, passa para o reserva. Depois de trocar, segue no reserva pelo resto da varredura.
+   */
   private async generate(params: GenerateParams) {
     try {
-      return await this.ai.models.generateContent({ ...params, model: this.model })
+      return await this.call(params)
     } catch (error) {
-      if (httpStatus(error) !== 429 || this.model === FALLBACK_MODEL) throw error
-      this.model = FALLBACK_MODEL
-      return this.ai.models.generateContent({ ...params, model: this.model })
+      if (httpStatus(error) === 429) return this.useFallback(params, error)
+      if (!isOverload(error)) throw error
+      await this.sleep(OVERLOAD_RETRY_MS)
+      try {
+        return await this.call(params)
+      } catch (retryError) {
+        if (httpStatus(retryError) !== 429 && !isOverload(retryError)) throw retryError
+        return this.useFallback(params, retryError)
+      }
     }
+  }
+
+  private async useFallback(params: GenerateParams, error: unknown) {
+    if (this.model === FALLBACK_MODEL) throw error
+    this.model = FALLBACK_MODEL
+    return this.call(params)
+  }
+
+  private call(params: GenerateParams) {
+    return this.ai.models.generateContent({ ...params, model: this.model })
   }
 }

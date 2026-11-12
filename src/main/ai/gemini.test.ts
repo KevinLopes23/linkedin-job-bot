@@ -88,6 +88,56 @@ describe('GeminiClient: modelo reserva', () => {
   })
 })
 
+describe('GeminiClient: Gemini sobrecarregado (503)', () => {
+  const okResponse = { text: JSON.stringify({ score: 70, strengths: [], gaps: [], summary: 'Ok.' }) }
+  const job = { title: 'Dev', company: 'X', location: 'BR', model: 'Remoto', description: 'Node' } as unknown as Job
+  /** Cada modelo falha com 503 nas primeiras N chamadas. */
+  const flakyAi = (failuresByModel: Record<string, number>) => {
+    const calls: string[] = []
+    const left = { ...failuresByModel }
+    const ai = {
+      models: {
+        generateContent: async ({ model }: { model: string }) => {
+          calls.push(model)
+          if ((left[model] ?? 0) > 0) {
+            left[model] = (left[model] ?? 0) - 1
+            throw new ApiError({ status: 503, message: 'This model is currently experiencing high demand. UNAVAILABLE' })
+          }
+          return okResponse
+        }
+      }
+    }
+    return { ai: ai as unknown as GoogleGenAI, calls }
+  }
+  const noSleep = async (): Promise<void> => undefined
+
+  it('503 passageiro: espera e tenta de novo no mesmo modelo', async () => {
+    const { ai, calls } = flakyAi({ 'gemini-flash-latest': 1 })
+    const waits: number[] = []
+    const client = new GeminiClient('k', 'gemini-flash-latest', ai, async (ms) => void waits.push(ms))
+    expect((await client.scoreJob(job, 'cv')).score).toBe(70)
+    expect(calls).toEqual(['gemini-flash-latest', 'gemini-flash-latest'])
+    expect(waits).toHaveLength(1)
+  })
+
+  it('503 de novo: passa para o modelo reserva', async () => {
+    const { ai, calls } = flakyAi({ 'gemini-flash-latest': 5 })
+    const client = new GeminiClient('k', 'gemini-flash-latest', ai, noSleep)
+    expect((await client.scoreJob(job, 'cv')).score).toBe(70)
+    expect(calls).toEqual(['gemini-flash-latest', 'gemini-flash-latest', FALLBACK_MODEL])
+  })
+
+  it('reserva também sobrecarregado: mensagem clara e a IA para nesta varredura', async () => {
+    const { ai } = flakyAi({ 'gemini-flash-latest': 5, [FALLBACK_MODEL]: 5 })
+    const message = await new GeminiClient('k', 'gemini-flash-latest', ai, noSleep)
+      .scoreJob(job, 'cv')
+      .then(() => '', (e: Error) => e.message)
+    expect(message).toMatch(/sobrecarregado/)
+    expect(message).not.toMatch(/\{"error"/)
+    expect(isFatalGeminiError(message)).toBe(true)
+  })
+})
+
 describe('erros do Gemini', () => {
   const api = (status: number, message: string): ApiError => new ApiError({ status, message })
 
