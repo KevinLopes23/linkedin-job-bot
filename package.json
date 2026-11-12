@@ -1,6 +1,6 @@
 {
   "name": "vagalume",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "App desktop que varre o LinkedIn, filtra as vagas que valem a pena e dá nota de match com o seu currículo",
   "main": "./out/main/index.js",

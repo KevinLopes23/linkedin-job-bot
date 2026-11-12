@@ -143,9 +143,23 @@ describe('checkDetail', () => {
     expect(checkDetail(html, candidate(), 50, false)).toMatchObject({ ok: true })
   })
 
-  it('modelo não escrito na vaga: remota vale o filtro (Remoto); cidade fica Indefinido (presencial ou híbrido)', () => {
+  it('busca remota sem "remoto" escrito em lugar nenhum é descartada (sem login o LinkedIn ignora o filtro f_WT)', () => {
+    // Caso real: "DESENVOLVEDOR(A) JÚNIOR / TI" em Curitiba veio na busca remota, mas era presencial.
+    const html = detailPage({ body: 'Curitiba, PR · 55 candidaturas', description: 'Suporte aos colaboradores', similar: 'Outra vaga - Remoto' })
+    expect(checkDetail(html, candidate({ model: 'Indefinido' }), 100)).toMatchObject({ ok: false, reason: expect.stringContaining('não diz que é remota') })
+  })
+
+  it('busca remota aprova quando o card ou a descrição dizem remoto/home office', () => {
+    const plain = detailPage({ body: 'São Paulo, SP', description: 'Vaga legal' })
+    expect(checkDetail(plain, candidate({ model: 'Remoto' }), 50)).toMatchObject({ ok: true, model: 'Remoto' })
+    for (const text of ['Trabalho 100% home office', 'Atuação remota', 'Modelo: remoto']) {
+      const html = detailPage({ body: 'São Paulo, SP', description: text })
+      expect(checkDetail(html, candidate({ model: 'Indefinido' }), 50)).toMatchObject({ ok: true, model: 'Remoto' })
+    }
+  })
+
+  it('busca por cidade sem modelo escrito fica Indefinido (presencial ou híbrido)', () => {
     const html = detailPage({ body: 'Rio de Janeiro e Região', description: 'Vaga legal', similar: 'Outra vaga - Híbrido' })
-    expect(checkDetail(html, candidate({ model: 'Indefinido' }), 50)).toMatchObject({ ok: true, model: 'Remoto' })
     expect(checkDetail(html, candidate({ model: 'Indefinido', searchKind: 'local' }), 50)).toMatchObject({ ok: true, model: 'Indefinido' })
   })
 })

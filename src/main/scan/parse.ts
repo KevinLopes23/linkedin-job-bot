@@ -146,16 +146,18 @@ export function checkDetail(html: string, candidate: Candidate, maxApplicants: n
   if (scope.length === 0) return { ok: false, reason: 'não abriu (o LinkedIn pediu login); fica para a próxima varredura' }
   const jobText = scope.text()
   const jobHtml = $.html(scope)
-  let model = modelFromDetail(jobText) ?? candidate.model
+  const model = modelFromDetail(jobText) ?? candidate.model
 
   if (candidate.searchKind === 'remoto' && (model === 'Presencial' || model === 'Híbrido')) {
     return { ok: false, reason: `é ${model} na página da vaga (busca remota)` }
   }
   if (isPromotedDetail(jobText, jobHtml)) return { ok: false, reason: 'é promovida' }
-  // Sem modelo escrito na vaga: na busca remota vale o filtro dela (f_WT=2). A página pública raramente diz
-  // "Remoto" na área da vaga; o bot só aprovava porque lia "vagas semelhantes". Na busca por cidade (f_WT=1,3)
-  // pode ser presencial ou híbrido, então fica Indefinido (a tela mostra "Presencial ou híbrido").
-  if (model === 'Indefinido' && candidate.searchKind === 'remoto') model = 'Remoto'
+  // Sem login o LinkedIn ignora o filtro de modelo (f_WT): a busca "remota" traz vagas presenciais também,
+  // e a página pública não mostra o modelo. Então só passa como remota a vaga que diz isso no título,
+  // no card ou na descrição. Na busca por cidade fica Indefinido (a tela mostra "Presencial ou híbrido").
+  if (model === 'Indefinido' && candidate.searchKind === 'remoto') {
+    return { ok: false, reason: 'não diz que é remota (o LinkedIn sem login não filtra por modelo)' }
+  }
   const applicants = parseApplicants(jobText)
   if (maxApplicants > 0 && applicants !== null && applicants > maxApplicants) {
     return { ok: false, reason: `tem ${applicants} candidatos (limite ${maxApplicants})` }

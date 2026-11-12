@@ -221,6 +221,9 @@ export function modelFromBadges(badges: string): WorkModel | null {
   return null
 }
 
+/** Jeitos comuns de uma vaga dizer que é remota. */
+const REMOTE_TEXT = /\bremot[oa]s?\b|\bremote\b|\bhome[ -]?office\b|\bteletrabalho\b|\bwork from home\b/
+
 /**
  * Modelo pela página de detalhe. Prioridade Híbrido > Presencial > Remoto, como no bot
  * ("Híbrido com possibilidade de remoto" é Híbrido). Null se não der para afirmar.
@@ -229,7 +232,7 @@ export function modelFromDetail(bodyText: string): WorkModel | null {
   const t = bodyText.toLowerCase()
   if (/\bhíbrido\b|\bhybrid\b/.test(t)) return 'Híbrido'
   if (/\bpresencial\b|\bon-site\b|\bon site\b/.test(t)) return 'Presencial'
-  if (/\bremoto\b|\bremote\b/.test(t)) return 'Remoto'
+  if (REMOTE_TEXT.test(t)) return 'Remoto'
   return null
 }
 
